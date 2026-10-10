@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1><a href="/source">Source</a> · {{ name }}</h1>
+<form method="get" action="/source/view" class="row">
+  <input type="hidden" name="path" value="{{ path }}">
+  <div><label>Search entries</label><input type="text" name="q" value="{{ q }}" placeholder="title, region…"></div>
+  <div class="shrink"><label>System</label><select name="system">
+    {% if not sysdef %}<option value="">choose…</option>{% endif %}
+    {% for key in systems %}<option {{ 'selected' if key == system }}>{{ key }}</option>{% endfor %}</select></div>
+  <div class="shrink"><button>Show</button></div>
+</form>
+
+{% if not sysdef %}
+<div class="flash warn">Pick the system this archive belongs to.</div>
+{% else %}
+<div class="totals" style="margin-top:.8rem">
+  <a class="badge {{ 'ok' if not show }}" href="?path={{ path | urlencode }}&system={{ system }}&q={{ q | urlencode }}">all</a>
+  {% for d in ['include', 'present', 'exclude', 'bios', 'skipped'] %}
+    <a class="badge s-{{ d }}" href="?path={{ path | urlencode }}&system={{ system }}&q={{ q | urlencode }}&show={{ d }}">{{ d }} {{ totals.get(d, 0) }}</a>
+  {% endfor %}
+</div>
+<p class="small muted">"include / exclude" is what the filter would decide; selecting an entry yourself overrides it.
+  "present" entries are already in <code>{{ system }}/</code> and are never overwritten.</p>
+
+<form hx-post="/source/preview" hx-target="#preview">
+  <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ system }}">
+  <div class="row">
+    <div class="shrink"><button name="mode" value="copy">Preview: add selected to library</button></div>
+    {% if sysdef.disc %}<div class="shrink"><button class="secondary" name="mode" value="chd">Preview: convert selected to CHD</button></div>{% endif %}
+    {% if sysdef.disc and in_backups %}<div class="shrink"><button class="secondary" name="mode" value="chd_file">Preview: convert this archive to CHD</button></div>{% endif %}
+  </div>
+  <div id="preview" style="margin-top:.6rem"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th><input type="checkbox" onclick="this.closest('table').querySelectorAll('input[name=names]').forEach(c => c.checked = this.checked)"></th>
+      <th>Entry</th><th class="num">Size</th><th>Filter</th><th></th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr><td>{% if r.decision != 'present' %}<input type="checkbox" name="names" value="{{ r.entry }}">{% endif %}</td>
+        <td class="small">{{ r.entry }}</td><td class="num small">{{ sizes.get(r.entry, 0) | size }}</td>
+        <td><span class="badge s-{{ r.decision }}">{{ r.decision }}</span><div class="small muted">{{ r.rule }}</div></td>
+        <td class="small"><a href="#" onclick="rlmDownload({{ ('/source/download?path=' ~ (path | urlencode) ~ '&member=' ~ (r.entry | urlencode)) | tojson | forceescape }}, {{ r.base | tojson | forceescape }}, this);return false">⬇</a></td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No matching entries.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if total > rows | length %}<p class="small muted">Showing {{ rows | length }} of {{ total }} — narrow it down with search.</p>{% endif %}
+</form>
+{% endif %}
+{% endblock %}

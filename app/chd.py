@@ -203,7 +203,7 @@ def _is_cancel(e: BaseException) -> bool:
     return type(e).__name__ == "Cancelled"
 
 
-def convert_game(ctx, cfg: Config, sysdef: System, g: Game, run=run_chdman) -> None:
+def convert_game(ctx, cfg: Config, sysdef: System, g: Game, run=run_chdman, backup: bool = True) -> None:
     folder = fsutil.ensure_dir(cfg.system_dir(sysdef.key))
     work = cfg.temp_dir / f"chd-{ctx.id}" / re.sub(r"[^\w.() -]", "_", g.name)
     if work.exists():
@@ -276,7 +276,7 @@ def convert_game(ctx, cfg: Config, sysdef: System, g: Game, run=run_chdman) -> N
             ctx.item(f"{target}.chd", "added", f"{len(tracks) or 1} track file(s)", before=before, after=after,
                      ratio=ratio)
             ctx.log(f"OK   {target}.chd  {before:,} -> {after:,} bytes ({ratio:.1%})")
-        if ok_all and before_total:
+        if ok_all and before_total and backup:
             _backup_original(ctx, cfg, sysdef, g)
     except BaseException as e:
         if not _is_cancel(e):

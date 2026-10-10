@@ -1,0 +1,29 @@
+<div class="panel">
+  {% if mode == 'chd_file' %}
+    <h3 style="margin-top:0">Dry run: convert to CHD → {{ system }}/</h3>
+    <ul class="small">{% for g in games %}<li>{{ g.name }}: {% for t in g.targets %}{{ t }}.chd {% endfor %}
+      <span class="badge s-{{ 'include' if g.status == 'convert' else g.status }}">{{ g.status }}</span> {{ g.detail }}</li>{% endfor %}</ul>
+    <p class="small muted">The archive stays in _source (it already is the backup).</p>
+    {% if totals.get('convert') %}
+    <form method="post" action="/source/run"><input type="hidden" name="path" value="{{ path }}">
+      <input type="hidden" name="system" value="{{ system }}"><input type="hidden" name="mode" value="chd_file">
+      <button>Convert</button></form>{% endif %}
+  {% else %}
+    <h3 style="margin-top:0">Dry run: {{ 'convert to CHD' if mode == 'chd' else 'copy' }} {{ names | length }} selected → {{ system }}/</h3>
+    <div class="totals">
+      <span class="badge ok">{{ totals.get('include', 0) }} to {{ 'convert' if mode == 'chd' else 'add' }}</span>
+      {% if totals.get('bios') %}<span class="badge warn">{{ totals.get('bios') }} BIOS → _bios/{{ system }}/</span>{% endif %}
+      {% if totals.get('present') %}<span class="badge">{{ totals.get('present') }} already present</span>{% endif %}
+      {% if totals.get('skipped') %}<span class="badge bad">{{ totals.get('skipped') }} skipped</span>{% endif %}
+    </div>
+    <ul class="small">{% for r in rows %}<li>{{ r.base }} — <span class="badge s-{{ r.decision }}">{{ r.decision }}</span> <span class="muted">{{ r.rule }}</span></li>{% endfor %}</ul>
+    {% if mode == 'chd' %}<p class="small muted">Per-game archives are converted with chdman; loose disc files are copied as-is. No extra backup is made — the source archive is the backup.</p>{% endif %}
+    {% if totals.get('include') or totals.get('bios') %}
+    <form method="post" action="/source/run">
+      <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ system }}">
+      <input type="hidden" name="mode" value="{{ mode }}">
+      {% for n in names %}<input type="hidden" name="names" value="{{ n }}">{% endfor %}
+      <button>{{ 'Convert' if mode == 'chd' else 'Add' }} {{ totals.get('include', 0) }}</button>
+    </form>{% endif %}
+  {% endif %}
+</div>

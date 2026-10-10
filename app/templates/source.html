@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Source archives</h1>
+<p class="muted small">Everything in <code>_source</code>. It is read-only here: you can browse and download entries, or copy / convert selected
+  entries into the library. Selecting entries yourself overrides the region filter; existing games are never overwritten.</p>
+
+<h2>Archives</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Archive</th><th class="num">Size</th><th>System</th><th></th></tr></thead>
+  <tbody>{% for a in top %}
+    <tr><td><a href="/source/view?path={{ a.path | urlencode }}">{{ a.name }}</a></td><td class="num">{{ a.size | size }}</td>
+      <td>{% if a.system %}<span class="badge ok">{{ a.system }}</span>{% else %}<span class="badge warn">non-conforming</span>{% endif %}</td>
+      <td class="small"><a href="#" onclick="rlmDownload({{ ('/source/download?path=' ~ (a.path | urlencode)) | tojson | forceescape }}, {{ a.name | tojson | forceescape }}, this);return false">⬇ download archive</a></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">No archives in _source.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Per-game backups</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Folder</th><th class="num">Files</th><th class="num">Size</th></tr></thead>
+  <tbody>{% for b in backups %}
+    <tr><td><a href="/source/backups/{{ b.name }}">_source/{{ b.name }}/</a>{% if not b.known %} <span class="badge warn">not a system</span>{% endif %}</td>
+      <td class="num">{{ b.count }}</td><td class="num">{{ b.size | size }}</td></tr>
+  {% else %}<tr><td colspan="3" class="muted">No per-game backup folders.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

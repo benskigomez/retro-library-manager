@@ -158,6 +158,42 @@ def extract_all(archive: Path, dest_dir: Path) -> None:
     raise ValueError(f"unsupported archive type: {archive}")
 
 
+def stream_member(archive: Path, member: str, chunk: int = 1024 * 1024):
+    """Yield one member's bytes without writing anything to disk (7z: via `7zz -so`)."""
+    archive = Path(archive)
+    if archive.suffix.lower() == ".zip":
+        with zipfile.ZipFile(archive) as zf, zf.open(member) as src:
+            while data := src.read(chunk):
+                yield data
+        return
+    exe = _sevenzip_bin()
+    if exe:
+        # -spd: no wildcard matching, so names with * ? [ ] are taken literally
+        proc = subprocess.Popen([exe, "e", "-so", "-spd", "-bd", str(archive), "--", member],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        assert proc.stdout is not None
+        try:
+            while data := proc.stdout.read(chunk):
+                yield data
+        finally:
+            proc.stdout.close()
+            proc.wait()
+        return
+    import tempfile
+
+    import py7zr
+
+    with tempfile.TemporaryDirectory(prefix="rlm-7z-") as tmp:
+        with py7zr.SevenZipFile(archive, "r") as z:
+            z.extract(path=tmp, targets=[member])
+        target = Path(tmp) / member
+        if not fsutil.is_within(target, tmp):
+            raise ValueError(f"unsafe path in archive: {member}")
+        with open(target, "rb") as f:
+            while data := f.read(chunk):
+                yield data
+
+
 # ---- inspection --------------------------------------------------------------
 
 @dataclass

@@ -99,6 +99,17 @@ Each file on a system page has a **⬇** link:
 - Multi-file games (a `.cue` with its tracks, `.gdi`, `.m3u` with all its discs) download as one zip, built on the fly with no temp copy.
 - `.chd` files on disc systems also offer **as BIN/CUE…** (CD) or **as ISO…** (DVD/UMD). This runs `chdman extractcd`/`extractdvd` as a job into the scratch folder, and the job page then shows a **Download** button. Prepared files are deleted after 24 hours. The library itself is never modified.
 
+### From the source archives
+
+The **Source** page lists every archive in `_source`, plus the per-game backups in `_source/<system>/`. Open one to search its entries. Each entry shows what the filter would decide and whether it is already in the library. From there you can:
+
+- **⬇** download one entry, streamed straight out of the zip or 7z with no temp copy, or download a whole archive or backup file.
+- **Add selected to library**: copy the entries you tick into `/roms/<system>/`. Your selection overrides the region filter (e.g. a `(Europe)` release with no US version). Entries already present are skipped, never overwritten. A dry run comes first.
+- **Convert selected to CHD** (disc systems): per-game archives inside a source zip are converted with chdman. No extra backup is made, because the source zip already is the backup.
+- **Convert this archive to CHD**, for a per-game backup in `_source/<system>/`. The archive stays where it is.
+
+`_source` is only ever read.
+
 **Choosing the save location:** Chromium browsers (Chrome, Edge) open a "Save as" dialog only on HTTPS or localhost. That covers using the app through an HTTPS reverse proxy, or over Tailscale with `tailscale serve`. On plain `http://jarvis:8787` the browser does a normal download, which asks for a location if *Settings → Downloads → Ask where to save each file* is on.
 
 ---

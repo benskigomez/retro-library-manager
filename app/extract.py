@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import archives, fsutil
 from .config import Config
-from .filters import BIOS, EXCLUDE, INCLUDE, RuleSet
+from .filters import BIOS, EXCLUDE, INCLUDE, Decision, RuleSet
 from .hooks import HOOKS
 from .systems import ARCHIVE_EXTS, System
 
@@ -75,9 +75,20 @@ def existing_names(folder: Path) -> set[str]:
     return {e.name.casefold() for e in os.scandir(folder) if e.is_file()}
 
 
-def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entry] | None = None) -> Plan:
+def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entry] | None = None,
+         select: set[str] | None = None) -> Plan:
+    """Decide every entry. With ``select``, only those entries are planned and the
+    operator's choice overrides the region/quality filter (never "present" or BIOS)."""
     archive = Path(archive)
     entries = entries if entries is not None else archives.list_entries(archive)
+    if select is not None:
+        entries = [e for e in entries if e.name in select]
+
+    def manual(d: Decision) -> Decision:
+        if select is not None and d.category == EXCLUDE:
+            return Decision(INCLUDE, f"selected manually (filter: {d.rule})")
+        return d
+
     rules = RuleSet(cfg.filters, sysdef.key)
     folder = cfg.system_dir(sysdef.key)
     bios_folder = cfg.bios_dir / sysdef.key
@@ -111,7 +122,7 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
             if ext not in ARCHIVE_EXTS:
                 p.rows.append(Row(e.name, base, OTHER, SKIPPED, f"not a set archive ({ext or 'no extension'})"))
                 continue
-            d = rules.decide_arcade(e.name)
+            d = manual(rules.decide_arcade(e.name))
             key = base.casefold()
             if d.category != INCLUDE:
                 p.rows.append(Row(e.name, base, SET, d.category, d.rule))
@@ -128,7 +139,7 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
         if kind == ROM and accepted and ext not in accepted:
             p.rows.append(Row(e.name, base, OTHER, SKIPPED, f"extension {ext or '(none)'} not accepted by {sysdef.key}"))
             continue
-        d = rules.decide(e.name)
+        d = manual(rules.decide(e.name))
         key = stem.casefold()
         # Inside one archive, "Game.cue" and "Game.bin" are distinct files; only
         # identical base names are duplicates. Against the folder, the stem decides.
@@ -220,13 +231,15 @@ def existing_stems_cache(ctx, folder: Path) -> set[str]:
     return cache
 
 
-def execute(ctx, cfg: Config, sysdef: System, archive: Path) -> dict:
+def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] | None = None,
+            convert: bool = False) -> dict:
+    """Extract the plan. ``convert``: per-game inner archives of disc systems become CHDs."""
     archive = Path(archive)
     ready = fsutil.wait_stable(archive, cfg.stability.wait_seconds)
     if not ready.ok:
         raise RuntimeError(f"{archive.name} is not ready: {ready.reason}")
     ctx.log(f"Archive {archive} is stable; planning against {cfg.system_dir(sysdef.key)}")
-    p = plan(cfg, sysdef, archive)
+    p = plan(cfg, sysdef, archive, select=set(select) if select else None)
     totals = p.totals
     ctx.log("Plan: " + ", ".join(f"{k} {v}" for k, v in sorted(totals.items())))
     ctx.count("matched", totals.get(INCLUDE, 0))
@@ -265,7 +278,13 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path) -> dict:
                         continue
                     inner = ex.member_to_temp(r.entry, ctx.check)
                     try:
-                        _unpack_inner(ctx, cfg, sysdef, inner, folder, r)
+                        if convert and sysdef.disc:
+                            from . import chd
+
+                            game = chd.Game(Path(r.base).stem, "archive", inner)
+                            chd.convert_game(ctx, cfg, sysdef, game, backup=False)  # the source zip is the backup
+                        else:
+                            _unpack_inner(ctx, cfg, sysdef, inner, folder, r)
                     finally:
                         shutil.rmtree(inner.parent, ignore_errors=True)
             except FileExistsError as e:
@@ -344,7 +363,7 @@ def run_job(state, ctx) -> dict:
         if not ready.ok:
             raise RuntimeError(f"{archive.name} is not ready: {ready.reason}")
         archive = import_archive(ctx, cfg, sysdef.key, archive, prm["import_mode"])
-    result = execute(ctx, cfg, sysdef, archive)
+    result = execute(ctx, cfg, sysdef, archive, select=prm.get("select"), convert=bool(prm.get("convert")))
     state.library.invalidate()
     return result
 
