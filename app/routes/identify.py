@@ -1,0 +1,96 @@
+"""Identify: import an archive or folder whose system(s) you don't know."""
+from __future__ import annotations
+
+import json
+from collections import Counter
+from pathlib import Path
+
+from fastapi import APIRouter, Form, HTTPException, Request
+
+from .. import archives, fsutil
+from ..extract import plan as make_plan
+from ..identify import identify, summarize
+from . import redirect, render, st
+
+router = APIRouter()
+
+
+def _source(s, path: str) -> Path:
+    p = s.check_browsable(path.strip())
+    if p.is_dir():
+        return p
+    if not p.is_file() or p.suffix.lower() not in archives.ARCHIVE_EXTS:
+        raise HTTPException(400, "pick a .zip/.7z archive or a folder")
+    return p
+
+
+@router.get("/identify")
+def identify_page(request: Request, path: str = ""):
+    return render(request, "identify.html", path=path)
+
+
+@router.post("/identify/scan")
+def scan(request: Request, path: str = Form(...)):
+    s = st(request)
+    p = _source(s, path)
+    ready = fsutil.wait_stable(p, s.cfg.stability.wait_seconds)
+    if not ready.ok:
+        return render(request, "partials/flash.html", kind="error", message=f"{p.name} is not ready: {ready.reason}")
+    idents = identify(p, s.systems, {e.lower() for e in s.cfg.ignore_extensions})
+    decided, ambiguous, unknown = summarize(idents)
+    assigned = {i.entry: i.system for i in idents if i.system}
+    amb_groups = [{"candidates": list(c), "items": items, "members": json.dumps([i.entry for i in items]),
+                   "suggestion": next((i.suggestion for i in items if i.suggestion), None),
+                   "how": Counter(i.how for i in items).most_common(1)[0][0]}
+                  for c, items in ambiguous.items()]
+    can_keep = p.is_file() and not fsutil.is_within(p, s.cfg.source_dir)
+    return render(request, "partials/identify_result.html", path=str(p), decided=decided, amb_groups=amb_groups,
+                  unknown=unknown, assigned=json.dumps(assigned), systems=s.systems, can_keep=can_keep)
+
+
+def _assignments(form) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = {}
+    for entry, system in json.loads(form.get("assigned") or "{}").items():
+        groups.setdefault(system, []).append(entry)
+    i = 0
+    while f"amb_members_{i}" in form:
+        system = form.get(f"amb_{i}") or ""
+        if system and system != "skip":
+            groups.setdefault(system, []).extend(json.loads(form[f"amb_members_{i}"]))
+        i += 1
+    return groups
+
+
+@router.post("/identify/plan")
+async def plan_view(request: Request):
+    s = st(request)
+    form = await request.form()
+    p = _source(s, form["path"])
+    groups = _assignments(form)
+    plans = []
+    for system, entries in sorted(groups.items()):
+        sysdef = s.system(system)
+        pl = make_plan(s.cfg, sysdef, p, select=set(entries), override=False)
+        plans.append({"system": system, "sysdef": sysdef, "plan": pl, "totals": pl.totals})
+    return render(request, "partials/identify_plan.html", path=str(p), plans=plans,
+                  groups=json.dumps(groups), keep=bool(form.get("keep")))
+
+
+@router.post("/identify/run")
+async def run(request: Request):
+    s = st(request)
+    form = await request.form()
+    p = _source(s, form["path"])
+    assignment: dict[str, list[str]] = json.loads(form["groups"])
+    if form.get("keep") and p.is_file():
+        s.queue.submit("source_keep", f"Keep a copy of {p.name} in _source", {"archive": str(p)})
+    for system, entries in sorted(assignment.items()):
+        if not form.get(f"use_{system}"):
+            continue
+        sysdef = s.system(system)
+        mode = form.get(f"mode_{system}")
+        convert = (mode == "chd") if (sysdef.disc and mode in ("chd", "original")) else None
+        s.queue.submit("extract", f"Identify: {len(entries)} file(s) from {p.name} → {system}",
+                       {"archive": str(p), "system": system, "import_mode": "none", "select": entries,
+                        "override": False, "convert": convert}, system=system)
+    return redirect(request, "/jobs")

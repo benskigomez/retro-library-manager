@@ -594,6 +594,26 @@ def import_archive(ctx, cfg: Config, system: str, archive: Path, mode: str) -> P
     return dest
 
 
+def keep_in_source(state, ctx) -> dict:
+    """Copy an archive into _source under its own name (copy, verify; never overwrite)."""
+    cfg = state.cfg
+    src = Path(ctx.params["archive"])
+    dest = cfg.source_dir / src.name
+    if dest.exists():
+        if dest.stat().st_size == src.stat().st_size and fsutil.md5_file(dest) == fsutil.md5_file(src):
+            ctx.log(f"_source/{dest.name} already exists with identical content")
+            return {}
+        raise RuntimeError(f"_source/{dest.name} already exists with different content; not overwriting")
+    ready = fsutil.wait_stable(src, cfg.stability.wait_seconds)
+    if not ready.ok:
+        raise RuntimeError(f"{src.name} is not ready: {ready.reason}")
+    fsutil.ensure_dir(cfg.source_dir)
+    fsutil.copy_verify(src, dest, ctx.check)
+    ctx.count("kept")
+    ctx.log(f"Copied {src} -> _source/{dest.name} (MD5 verified)")
+    return {}
+
+
 def run_job(state, ctx) -> dict:
     prm = ctx.params
     sysdef = state.system(prm["system"])

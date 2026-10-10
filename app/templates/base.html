@@ -16,6 +16,7 @@
   <nav>
     <a href="/" class="{{ 'active' if nav_path == '/' or nav_path.startswith('/system') }}">Library</a>
     <a href="/import" class="{{ 'active' if nav_path.startswith('/import') or nav_path.startswith('/extract') }}">Import</a>
+    <a href="/identify" class="{{ 'active' if nav_path.startswith('/identify') }}">Identify</a>
     <a href="/source" class="{{ 'active' if nav_path.startswith('/source') }}">Source</a>
     <a href="/chd" class="{{ 'active' if nav_path.startswith('/chd') }}">Disc → CHD</a>
     <a href="/bios" class="{{ 'active' if nav_path.startswith('/bios') }}">BIOS</a>

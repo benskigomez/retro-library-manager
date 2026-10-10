@@ -21,7 +21,7 @@ def test_all_pages_render(client, roms, tmp_path):
 
     pages = [
         "/", "/?rescan=1", "/system/gb", "/system/gb?show=flagged", "/system/lynx", "/system/mame",
-        "/import", "/import?system=gb", "/chd", "/chd?system=psx", "/bios", "/arcade",
+        "/import", "/import?system=gb", "/identify", "/source", "/system/gb?q=tetris", "/chd", "/chd?system=psx", "/bios", "/arcade",
         f"/arcade/results/{verify['id']}", f"/arcade/results/{verify['id']}?status=unknown",
         "/jobs", f"/jobs/{verify['id']}", f"/jobs/{verify['id']}/status", "/trash", f"/trash/{batch}",
         f"/trash/{batch}?action=restore", f"/trash/{batch}?action=purge",

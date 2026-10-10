@@ -22,7 +22,7 @@ def dashboard(request: Request, rescan: int = 0):
 
 
 @router.get("/system/{key}")
-def system_page(request: Request, key: str, show: str = "all"):
+def system_page(request: Request, key: str, show: str = "all", q: str = ""):
     s = st(request)
     if key not in s.systems:
         raise HTTPException(404, f"unknown system {key}")
@@ -30,6 +30,7 @@ def system_page(request: Request, key: str, show: str = "all"):
     status = scan_system(s.cfg, sysdef)
     folder = s.cfg.system_dir(key)
     files = []
+    ql = q.casefold().strip()
     if folder.is_dir():
         accepted = sysdef.rom_extensions
         for e in sorted(os.scandir(folder), key=lambda e: e.name.casefold()):
@@ -43,12 +44,14 @@ def system_page(request: Request, key: str, show: str = "all"):
             if show == "flagged" and kind in ("game", "meta"):
                 continue
             multi = ext in (".cue", ".gdi", ".m3u") and len(download.game_files(Path(e.path))) > 1
+            if ql and ql not in e.name.casefold():
+                continue
             files.append({"name": e.name, "size": e.stat().st_size, "kind": kind,
                           "dl_name": (Path(e.name).stem + ".zip") if multi else e.name, "is_chd": ext == ".chd"})
     jobs = s.queue.recent(20, system=key)
     filters = s.cfg.filters.systems.get(key)
     return render(request, "system.html", sysdef=sysdef, status=status, files=files, jobs=jobs,
-                  show=show, filters=filters)
+                  show=show, filters=filters, q=q)
 
 
 @router.post("/system/{key}/trash/preview")

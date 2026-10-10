@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Identify and import</h1>
+<p class="muted small">For an archive (.zip/.7z) or a folder of files when you don't know which system(s) they belong to — e.g. a mixed download.
+  Each file is identified by its header, its extension, what is inside per-game zips, or its folder name. You confirm anything ambiguous,
+  then get a normal filtered dry run per system. Nothing is written until you run it, originals are left where they are, and existing games
+  are never overwritten.</p>
+<div class="panel">
+  <form class="stack" style="max-width:none" hx-post="/identify/scan" hx-target="#ident" hx-indicator="#ident-spin">
+    <div class="row">
+      <div><label for="ident-path">Archive or folder</label>
+        <input type="text" id="ident-path" name="path" value="{{ path }}" required placeholder="{{ state.cfg.paths.roms }}/_incoming/mixed.zip"></div>
+      <div class="shrink"><button type="button" class="secondary"
+        hx-get="/files/browse?path={{ state.cfg.paths.roms | urlencode }}&target=ident-path" hx-target="#ident-picker">Browse archive…</button></div>
+      <div class="shrink"><button type="button" class="secondary"
+        hx-get="/files/browse?path={{ state.cfg.paths.roms | urlencode }}&target=ident-path&pick=dir" hx-target="#ident-picker">Browse folder…</button></div>
+    </div>
+    <div id="ident-picker"></div>
+    <div><button type="submit">Identify</button> <span id="ident-spin" class="htmx-indicator muted small">checking the files are complete, then reading headers…</span></div>
+  </form>
+</div>
+<div id="ident"></div>
+<div id="ident-plan"></div>
+{% endblock %}

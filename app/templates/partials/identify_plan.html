@@ -1,0 +1,27 @@
+<form class="panel" method="post" action="/identify/run">
+  <input type="hidden" name="path" value="{{ path }}">
+  <input type="hidden" name="groups" value="{{ groups }}">
+  {% if keep %}<input type="hidden" name="keep" value="1">{% endif %}
+  <h2 style="margin-top:0">Dry run</h2>
+  <p class="small muted">The normal region/quality filters apply (use the Source page later to override them for single titles).
+    One job per system; each re-plans against the disk when it starts.</p>
+  {% for x in plans %}{% set t = x.totals %}
+  <div style="border-top:1px solid var(--border);padding:.6rem 0">
+    <label style="font-weight:normal"><input type="checkbox" name="use_{{ x.system }}" value="1" {{ 'checked' if t.get('include') or t.get('bios') }}>
+      <b>{{ x.system }}</b> <span class="muted">{{ x.sysdef.name }}</span></label>
+    <div class="totals">
+      {% for d in ['include', 'present', 'exclude', 'bios', 'skipped', 'part'] if t.get(d) %}<span class="badge s-{{ d }}">{{ d }} {{ t.get(d) }}</span>{% endfor %}
+    </div>
+    {% if x.sysdef.disc %}
+    <label style="display:inline;font-weight:normal" class="small">Disc games:
+      <select name="mode_{{ x.system }}" style="width:auto;display:inline-block">
+        <option value="chd" {{ 'selected' if x.sysdef.prefers_chd }}>convert to CHD</option>
+        <option value="original" {{ 'selected' if not x.sysdef.prefers_chd }}>copy original files</option></select></label>
+    {% endif %}
+    <details><summary class="small">entries</summary><ul class="small">
+      {% for r in x.plan.rows[:300] %}<li>{{ r.base }} — <span class="badge s-{{ r.decision }}">{{ r.decision }}</span> <span class="muted">{{ r.rule }}</span></li>{% endfor %}
+    </ul></details>
+  </div>
+  {% else %}<p class="muted">No system selected.</p>{% endfor %}
+  {% if plans %}<p><button type="submit">Run checked systems</button></p>{% endif %}
+</form>

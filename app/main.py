@@ -64,10 +64,11 @@ def create_app(settings: Settings | None = None, start_workers: bool = True) -> 
     app.state.templates = make_templates()
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
-    from .routes import arcade, bios, chd, dashboard, download, extract, files, jobs, settings_page, source, trash
+    from .routes import (arcade, bios, chd, dashboard, download, extract, files, identify, jobs, settings_page, source,
+                         trash)
 
     deps = [Depends(require_auth)]
-    for module in (dashboard, jobs, settings_page, trash, files, extract, chd, bios, arcade, download, source):
+    for module in (dashboard, jobs, settings_page, trash, files, extract, chd, bios, arcade, download, source, identify):
         app.include_router(module.router, dependencies=deps)
 
     @app.get("/healthz", include_in_schema=False)

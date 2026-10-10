@@ -20,6 +20,7 @@ def register_handlers(state: State) -> None:
     q.register("mame_hide")(lambda ctx: arcade.run_hide(state, ctx))
     q.register("mame_bundle")(lambda ctx: arcade.run_bundle(state, ctx))
     q.register("download_convert")(lambda ctx: download.run_convert(state, ctx))
+    q.register("source_keep")(lambda ctx: extract.keep_in_source(state, ctx))
     q.register("lynx_regen")(lambda ctx: extract_lynx_regen(state, ctx))
 
 

@@ -87,6 +87,18 @@ Rules match the entry's **base file name**, never its folder. They are applied i
 2. **Import → Inspect** (refuses files that are still being copied) → confirm the system → **Dry run** → review or download the CSV → **Run**.
 3. Follow the live log on the job page. Re-running the same archive later only adds what is new.
 
+**Don't know the system?** Use **Identify** with an archive or a folder of mixed files. Each file is matched to a system by:
+- its header: Genesis/32X carts, Sega CD/Saturn/Dreamcast, PC Engine CD, PlayStation/PSP, GameCube/Wii discs;
+- its extension, where it is the primary format of exactly one system (e.g. `.gb` means `gb`, even though `gbc` also accepts it);
+- the files inside per-game zips, sampled per folder;
+- folder names such as `SNES/` or `Genesis/`.
+
+You choose a system for anything still ambiguous (e.g. small headerless `.bin` files, which are usually Atari). You then get the normal filtered dry run for each system and one job per system. Originals stay where they are. Optionally, a copy of the archive is kept in `_source/` under its own name.
+
+**Disc games** are handled as whole sets. A `.cue`/`.gdi` and every track it references are planned together, and selecting either one brings the whole set. A set with missing tracks, or one that is partly in the library already, is refused rather than mixed. CloneCD (`.ccd/.img/.sub`) layouts are skipped with a reason. Disc systems default to `prefer: chd` in `systems.yaml`, so disc games are converted to CHD when added. Choose "copy original files" on the dry run, or set `prefer: original`, to keep `.cue/.bin/.iso`.
+
+Every system page has a **search box** for its files.
+
 Disc systems: put per-game archives in a folder, then go to **Disc → CHD** → pick the folder and system → **Dry run** → **Convert selected**.
 
 ---

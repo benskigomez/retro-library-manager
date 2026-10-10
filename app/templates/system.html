@@ -40,6 +40,14 @@
 {% include "partials/job_table.html" %}
 
 <h2>Files {% if show == 'flagged' %}<span class="muted small">(non-game only · <a href="?">show all</a>)</span>{% endif %}</h2>
+<form method="get" class="row" style="margin-bottom:.6rem" id="file-search">
+  {% if show != 'all' %}<input type="hidden" name="show" value="{{ show }}">{% endif %}
+  <div><input type="search" name="q" value="{{ q }}" placeholder="Search {{ sysdef.key }} files: title, region, extension…" autocomplete="off"
+    hx-get="/system/{{ sysdef.key }}" hx-trigger="input changed delay:300ms, search" hx-include="#file-search"
+    hx-select="#file-list" hx-target="#file-list" hx-swap="outerHTML" hx-push-url="true"></div>
+  <div class="shrink"><button>Search</button></div>
+</form>
+<div id="file-list">
 <form hx-post="/system/{{ sysdef.key }}/trash/preview" hx-target="#trash-preview">
   <div class="row"><div class="shrink"><button class="secondary" type="submit">Preview move selected to trash</button></div></div>
   <div id="trash-preview"></div>
@@ -51,9 +59,10 @@
         <td class="num">{{ f.size | size }}</td><td><span class="badge {{ 'ok' if f.kind in ('game', 'meta') else 'warn' }}">{{ f.kind }}</span></td>
         <td class="small">{% if f.kind != 'meta' %}<a href="#" onclick="rlmDownload({{ ('/download/' ~ sysdef.key ~ '/' ~ (f.name | urlencode)) | tojson | forceescape }}, {{ f.dl_name | tojson | forceescape }}, this);return false">⬇ {{ 'zip' if f.dl_name != f.name else 'file' }}</a>
           {% if f.is_chd and sysdef.disc %}· <a href="#" hx-post="/download/{{ sysdef.key }}/{{ f.name | urlencode }}/convert" hx-vals='{"format": "{{ 'iso' if sysdef.disc == 'dvd' else 'cue' }}"}'>as {{ 'ISO' if sysdef.disc == 'dvd' else 'BIN/CUE' }}…</a>{% endif %}{% endif %}</td></tr>
-    {% else %}<tr><td colspan="5" class="muted">No files.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="5" class="muted">{{ 'No files match "' ~ q ~ '".' if q else 'No files.' }}</td></tr>{% endfor %}
     </tbody>
   </table></div>
-  {% if files | length > 3000 %}<p class="muted small">Showing the first 3000 of {{ files | length }} files.</p>{% endif %}
+  {% if files | length > 3000 %}<p class="muted small">Showing the first 3000 of {{ files | length }} files — narrow it down with search.</p>{% endif %}
 </form>
+</div>
 {% endblock %}

@@ -1,0 +1,44 @@
+<form class="panel" hx-post="/identify/plan" hx-target="#ident-plan">
+  <input type="hidden" name="path" value="{{ path }}">
+  <input type="hidden" name="assigned" value="{{ assigned }}">
+  <h2 style="margin-top:0">Identified</h2>
+  {% if decided %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>System</th><th class="num">Files</th><th>How</th><th>Examples</th></tr></thead>
+    <tbody>{% for system, items in decided.items() %}
+      <tr><td><b>{{ system }}</b> <span class="muted small">{{ systems[system].name }}</span></td><td class="num">{{ items | length }}</td>
+        <td class="small">{{ (items | map(attribute='how') | unique | list)[:2] | join('; ') }}</td>
+        <td class="small">{% for i in items[:3] %}{{ i.entry.rsplit('/', 1)[-1] }}{% if i.tracks %} (+{{ i.tracks }} tracks){% endif %}<br>{% endfor %}
+          {% if items | length > 3 %}<span class="muted">…and {{ items | length - 3 }} more</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="muted">Nothing could be identified automatically.</p>{% endif %}
+
+  {% if amb_groups %}
+  <h3>Needs your choice</h3>
+  {% for g in amb_groups %}
+    <div class="row" style="margin:.4rem 0;align-items:center">
+      <div><b>{{ g['items'] | length }} file(s)</b> — <span class="small">{{ g.how }}</span>
+        <details><summary class="small">show</summary><ul class="small">{% for i in g['items'][:200] %}<li>{{ i.entry }}</li>{% endfor %}</ul></details></div>
+      <div class="shrink">
+        <input type="hidden" name="amb_members_{{ loop.index0 }}" value="{{ g.members }}">
+        <select name="amb_{{ loop.index0 }}">
+          <option value="skip">skip these</option>
+          {% for c in g.candidates %}<option value="{{ c }}" {{ 'selected' if c == g.suggestion }}>{{ c }} — {{ systems[c].name }}</option>{% endfor %}
+          <optgroup label="other systems">{% for k, sd in systems.items() if k not in g.candidates %}<option value="{{ k }}">{{ k }}</option>{% endfor %}</optgroup>
+        </select></div>
+    </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if unknown %}
+  <details style="margin-top:.6rem"><summary>{{ unknown | length }} file(s) not recognised (left alone)</summary>
+    <ul class="small">{% for i in unknown[:300] %}<li>{{ i.entry }} <span class="muted">— {{ i.how }}</span></li>{% endfor %}</ul></details>
+  {% endif %}
+
+  {% if can_keep %}
+  <p><label style="font-weight:normal"><input type="checkbox" name="keep" value="1" checked>
+    Keep a copy of this archive in <code>_source/</code> under its own name (it doesn't belong to one system)</label></p>
+  {% endif %}
+  <p><button type="submit">Dry run per system</button></p>
+</form>
