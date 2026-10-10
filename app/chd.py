@@ -85,6 +85,8 @@ def discover(cfg: Config, sysdef: System, input_path: Path) -> list[Game]:
             games.append(g)
         elif p.is_dir():
             names = [str(Path(r) / f) for r, _d, fs in os.walk(p) for f in fs]
+            if not any(Path(n).suffix.lower() in DISC_EXTS for n in names):
+                continue  # e.g. RetroBat's images/ manuals/ videos/ folders: not a disc set
             g = Game(p.name, "folder", p, size=sum(Path(n).stat().st_size for n in names))
             descs, problem = pick_descriptors(names)
             g.targets = _targets(descs, g.name)

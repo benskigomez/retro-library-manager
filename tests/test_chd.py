@@ -122,6 +122,20 @@ def test_gdi_tracks_parsed(tmp_path):
     assert len(present) == 2 and missing == ["track03.bin"]
 
 
+def test_system_folder_mismatch_is_refused_and_media_folders_skipped(client, roms):
+    folder = roms / "pcenginecd"
+    make_zip(folder / "Buster Bros. (USA).zip", {"Buster Bros. (USA).cue": cue("b.bin"), "b.bin": b"\0"})
+    for media in ("images", "manuals", "videos"):
+        (folder / media).mkdir()
+        (folder / media / "x.png").write_bytes(b"png")
+    r = client.post("/chd/plan", data={"path": str(folder), "system": "psx"})
+    assert "inside the pcenginecd folder" in r.text and "Dry run" not in r.text
+    r = client.post("/chd/run", data={"path": str(folder), "system": "psx", "only": ["Buster Bros. (USA)"]})
+    assert r.status_code == 400 and not (roms / "psx").exists()
+    r = client.post("/chd/plan", data={"path": str(folder), "system": "pcenginecd"})
+    assert "convert 1" in r.text and "images" not in r.text and "no descriptor" not in r.text
+
+
 def test_chd_plan_route(client, roms):
     inbox = roms / "incoming"
     make_zip(inbox / "G (USA).zip", {"G (USA).cue": cue("g.bin"), "g.bin": b"\0"})

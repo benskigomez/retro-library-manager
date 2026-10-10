@@ -14,7 +14,7 @@
       <div class="shrink"><button type="button" class="secondary"
         hx-get="/files/browse?path={{ state.cfg.paths.roms | urlencode }}&target=chd-path&pick=dir" hx-target="#chd-picker">Browse…</button></div>
       <div class="shrink"><label>System</label>
-        <select name="system">{% for key, sd in systems.items() %}<option value="{{ key }}" {{ 'selected' if key == system }}>{{ key }} ({{ sd.disc }})</option>{% endfor %}</select></div>
+        <select name="system" required>{% if not system %}<option value="" disabled selected>choose…</option>{% endif %}{% for key, sd in systems.items() %}<option value="{{ key }}" {{ 'selected' if key == system }}>{{ key }} ({{ sd.disc }})</option>{% endfor %}</select></div>
     </div>
     <div id="chd-picker"></div>
     <div><button type="submit">Dry run</button> <span id="chd-spin" class="htmx-indicator muted small">reading…</span></div>

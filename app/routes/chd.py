@@ -8,10 +8,20 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
 
+from .. import fsutil
 from ..chd import discover
 from . import redirect, render, st
 
 router = APIRouter()
+
+
+def system_mismatch(s, p: Path, system: str) -> str | None:
+    """Input inside another system's game folder: almost certainly the wrong system."""
+    for key in s.systems:
+        if key != system and fsutil.is_within(p, s.cfg.system_dir(key)):
+            return (f"{p} is inside the {key} folder, but {system} is selected. "
+                    f"Choose {key} so the CHDs and backups go to the right place.")
+    return None
 
 
 def _disc_systems(s):
@@ -35,6 +45,9 @@ def chd_plan(request: Request, path: str = Form(...), system: str = Form(...)):
     sysdef = s.system(system)
     if not sysdef.disc:
         raise HTTPException(400, f"{system} is not a disc system")
+    problem = system_mismatch(s, p, system)
+    if problem:
+        return render(request, "partials/flash.html", kind="error", message=problem)
     games = discover(s.cfg, sysdef, p)
     totals = Counter(g.status for g in games)
     return render(request, "partials/chd_plan.html", games=games, totals=totals, path=str(p), sysdef=sysdef)
@@ -47,6 +60,9 @@ def chd_run(request: Request, path: str = Form(...), system: str = Form(...), on
     sysdef = s.system(system)
     if not only:
         raise HTTPException(400, "no games selected")
+    problem = system_mismatch(s, p, system)
+    if problem:
+        raise HTTPException(400, problem)
     job_id = s.queue.submit("chd", f"CHD {p.name} → {system}", {"input": str(p), "system": sysdef.key, "only": only},
                             system=sysdef.key)
     return redirect(request, f"/jobs/{job_id}")
