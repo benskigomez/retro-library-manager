@@ -7,7 +7,7 @@
 {% endif %}
 <div class="panel">
   <dl class="kv">
-    <dt>Games</dt><dd>{{ status.game_count }} ({{ status.file_count }} files, {{ status.bytes | size }})</dd>
+    <dt>Games</dt><dd>{{ status.game_count }} · folder total incl. scraped media: {{ status.file_count }} files, {{ status.bytes | size }}</dd>
     <dt>Extensions</dt><dd>{% for e in sysdef.extensions %}<code>{{ e }}</code> {% endfor %}</dd>
     <dt>Type</dt><dd>{% if sysdef.arcade %}arcade (sets copied as-is){% elif sysdef.disc %}disc ({{ sysdef.disc }}, chdman create{{ sysdef.disc }}){% else %}cartridge{% endif %}
       {% if sysdef.hooks %} · hooks: {{ sysdef.hooks | join(', ') }}{% endif %}</dd>
