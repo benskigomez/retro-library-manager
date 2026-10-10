@@ -103,7 +103,7 @@ class JobQueue:
     def cancel(self, job_id: int) -> None:
         self.db.execute("UPDATE jobs SET cancel=1 WHERE id=?", (job_id,))
         self.db.execute(
-            "UPDATE jobs SET status='cancelled', ended_at=datetime('now') WHERE id=? AND status='queued'",
+            "UPDATE jobs SET status='cancelled', ended_at=datetime('now','localtime') WHERE id=? AND status='queued'",
             (job_id,),
         )
 
@@ -131,7 +131,7 @@ class JobQueue:
     # worker --------------------------------------------------------------------
     def start(self) -> None:
         self.db.execute(
-            "UPDATE jobs SET status='interrupted', ended_at=datetime('now'), "
+            "UPDATE jobs SET status='interrupted', ended_at=datetime('now','localtime'), "
             "error='app restarted while job was running' WHERE status='running'"
         )
         self._stop.clear()
@@ -153,7 +153,7 @@ class JobQueue:
             if not row:
                 return None
             self.db.execute(
-                "UPDATE jobs SET status='running', started_at=datetime('now') WHERE id=?", (row["id"],)
+                "UPDATE jobs SET status='running', started_at=datetime('now','localtime') WHERE id=?", (row["id"],)
             )
             return _row(row)
 
@@ -185,7 +185,7 @@ class JobQueue:
         ctx.log(f"Finished with status {status}. Summary: {json.dumps(summary, default=str)}")
         ctx.close()
         self.db.execute(
-            "UPDATE jobs SET status=?, ended_at=datetime('now'), summary=?, error=? WHERE id=?",
+            "UPDATE jobs SET status=?, ended_at=datetime('now','localtime'), summary=?, error=? WHERE id=?",
             (status, dumps(summary), error, job["id"]),
         )
 

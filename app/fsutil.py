@@ -43,18 +43,22 @@ def _fix_one(p: Path) -> None:
         return
     if stat.S_ISLNK(st.st_mode):
         return
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
+    # Skip syscalls when nothing would change: recursive passes over big
+    # folders on Unraid's FUSE layer are otherwise slow.
+    if hasattr(os, "geteuid") and os.geteuid() == 0 and (st.st_uid, st.st_gid) != (OWNERSHIP.uid, OWNERSHIP.gid):
         try:
             os.chown(p, OWNERSHIP.uid, OWNERSHIP.gid)
         except OSError:
             pass
-    mode = stat.S_IMODE(st.st_mode) | 0o666
+    old = stat.S_IMODE(st.st_mode)
+    mode = old | 0o666
     if stat.S_ISDIR(st.st_mode) or st.st_mode & 0o111:
         mode |= 0o111  # the "X" in a+rwX
-    try:
-        os.chmod(p, mode)
-    except OSError:
-        pass
+    if mode != old:
+        try:
+            os.chmod(p, mode)
+        except OSError:
+            pass
 
 
 def fix_perms(path: Path, recursive: bool = False) -> None:

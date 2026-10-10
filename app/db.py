@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     system      TEXT,
     params      TEXT NOT NULL DEFAULT '{}',
     status      TEXT NOT NULL DEFAULT 'queued',   -- queued|running|done|failed|cancelled|interrupted
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     started_at  TEXT,
     ended_at    TEXT,
     summary     TEXT NOT NULL DEFAULT '{}',

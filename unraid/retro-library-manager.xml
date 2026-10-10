@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>retro-library-manager</Name>
+  <Repository>ghcr.io/benskigomez/retro-library-manager:latest</Repository>
+  <Registry>https://github.com/benskigomez/retro-library-manager/pkgs/container/retro-library-manager</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/benskigomez/retro-library-manager/issues</Support>
+  <Project>https://github.com/benskigomez/retro-library-manager</Project>
+  <Overview>Manage a RetroBat ROM library on an Unraid share: import and region-filter ROM sets with a dry run, convert discs to CHD, stage and install BIOS files, verify MAME sets and hide non-games. Files are written as nobody:users with a+rwX; nothing is ever overwritten and removals go to a trash folder.</Overview>
+  <Category>Tools: GameServers:</Category>
+  <WebUI>http://[IP]:[PORT:8787]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/benskigomez/retro-library-manager/main/unraid/retro-library-manager.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/benskigomez/retro-library-manager/main/app/static/icon.png</Icon>
+  <ExtraParams>--user 99:100</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Web UI port" Target="8787" Default="8787" Mode="tcp" Description="Web interface" Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+  <Config Name="ROM share" Target="/roms" Default="/mnt/user/roms" Mode="rw" Description="RetroBat ROM library (\\jarvis\roms). Config, database and logs are kept in /roms/_manager so the share backup covers them." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/roms</Config>
+  <Config Name="Scratch (fast storage)" Target="/tmp/rlm" Default="/mnt/cache/appdata/retro-library-manager/tmp" Mode="rw" Description="Temporary extraction / CHD work area. Put it on the cache pool or an SSD." Type="Path" Display="always" Required="true" Mask="false">/mnt/cache/appdata/retro-library-manager/tmp</Config>
+  <Config Name="Desktop BIOS folder (optional)" Target="/desktop_bios" Default="" Mode="rw,slave" Description="Optional: G:\RetroBat\bios shared from the desktop and mounted with Unassigned Devices (e.g. /mnt/remotes/DESKTOP_bios). Then set paths.desktop_bios: /desktop_bios in Settings. Leave empty to use export mode." Type="Path" Display="always" Required="false" Mask="false"/>
+  <Config Name="Initial user name" Target="RLM_USERNAME" Default="admin" Mode="" Description="Login user name." Type="Variable" Display="always" Required="false" Mask="false">admin</Config>
+  <Config Name="Initial password" Target="RLM_PASSWORD" Default="" Mode="" Description="Used only on first start, before a password hash exists in config.yaml. Leave empty to have a random one printed to the container log. Change it later on the Settings page." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Time zone" Target="TZ" Default="America/Chicago" Mode="" Description="Time zone for job timestamps." Type="Variable" Display="advanced" Required="false" Mask="false">America/Chicago</Config>
+</Container>
