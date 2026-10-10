@@ -19,7 +19,8 @@
 {% endif %}
 
 {% if scan.unknown_folders %}
-<div class="flash warn">Folders not in systems.yaml (RetroBat may not show them):
+<div class="flash warn">Folders not defined in systems.yaml — this app doesn't manage them until you add them under
+  <a href="/settings?which=systems">Settings → systems.yaml</a>:
   {% for f in scan.unknown_folders %}<code>{{ f }}</code> {% endfor %}</div>
 {% endif %}
 
@@ -45,7 +46,7 @@
     {% if s.flagged %}
     <div class="small" style="color:var(--warn)">
       {% if s.archives_unexpected %}{{ s.archives_unexpected }} archive(s) where loose ROMs are expected. {% endif %}
-      {% for ext, n in s.unrecognized[:4] %}{{ n }}× <code>{{ ext }}</code> {% endfor %}unrecognized
+      {% if s.unrecognized %}{% for ext, n in s.unrecognized[:4] %}{{ n }}× <code>{{ ext }}</code> {% endfor %}unrecognized{% endif %}
     </div>
     {% endif %}
     <div class="small muted">

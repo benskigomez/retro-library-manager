@@ -29,6 +29,9 @@ def test_dashboard_reads_library(client, roms):
     assert "MysteryFolder" in body
     assert "archive(s) where loose ROMs are expected" in body
     assert ".foo" in body
+    # gb has only an unexpected archive: no dangling "unrecognized" label
+    assert "expected. \n      unrecognized" not in body and "</code> unrecognized" in body
+    assert body.count("unrecognized") == 1  # only lynx's .foo
     r = client.get("/system/lynx")
     assert r.status_code == 200 and "Weird.foo" in r.text
 
