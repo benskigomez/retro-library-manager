@@ -1,0 +1,110 @@
+# RetroBat system definitions used by Retro Library Manager.
+#
+# Keys are RetroBat ROM folder names and must match RetroBat exactly.
+#   name:        display name
+#   extensions:  accepted game file extensions (lower case, with dot). Archive
+#                extensions (.zip/.7z) are deliberately NOT listed for cartridge
+#                systems: loose ROMs are expected, so archives get flagged.
+#   disc:        null, "cd" (chdman createcd) or "dvd" (chdman createdvd)
+#   arcade:      true = archives are game sets; never unpacked, copied as-is
+#   hooks:       post-processing hooks run after extraction (e.g. lynx)
+
+systems:
+  gb:
+    name: Nintendo Game Boy
+    extensions: [.gb]
+  gbc:
+    name: Nintendo Game Boy Color
+    extensions: [.gbc, .gb]
+  gba:
+    name: Nintendo Game Boy Advance
+    extensions: [.gba]
+  nes:
+    name: Nintendo Entertainment System
+    extensions: [.nes, .unf, .unif, .fds]
+  snes:
+    name: Super Nintendo
+    extensions: [.sfc, .smc, .fig, .swc, .bs]
+  n64:
+    name: Nintendo 64
+    extensions: [.z64, .n64, .v64]
+  nds:
+    name: Nintendo DS
+    extensions: [.nds]
+  3ds:
+    name: Nintendo 3DS
+    extensions: [.3ds, .cci, .cia, .cxi, .3dsx, .app]
+  gamecube:
+    name: Nintendo GameCube
+    extensions: [.iso, .gcm, .rvz, .ciso, .gcz, .m3u]
+  wii:
+    name: Nintendo Wii
+    extensions: [.iso, .wbfs, .rvz, .ciso, .gcz, .wad, .m3u]
+  psx:
+    name: Sony PlayStation
+    extensions: [.chd, .cue, .bin, .iso, .img, .pbp, .m3u]
+    disc: cd
+  ps2:
+    name: Sony PlayStation 2
+    extensions: [.chd, .iso, .cso, .cue, .bin, .m3u]
+    disc: dvd
+  psp:
+    name: Sony PlayStation Portable
+    extensions: [.chd, .iso, .cso, .pbp]
+    disc: dvd
+  megadrive:
+    name: Sega Mega Drive / Genesis
+    extensions: [.md, .gen, .bin, .smd]
+  mastersystem:
+    name: Sega Master System
+    extensions: [.sms]
+  gamegear:
+    name: Sega Game Gear
+    extensions: [.gg]
+  segacd:
+    name: Sega CD / Mega-CD
+    extensions: [.chd, .cue, .bin, .iso, .m3u]
+    disc: cd
+  sega32x:
+    name: Sega 32X
+    extensions: [.32x]
+  saturn:
+    name: Sega Saturn
+    extensions: [.chd, .cue, .bin, .iso, .m3u]
+    disc: cd
+  dreamcast:
+    name: Sega Dreamcast
+    extensions: [.chd, .gdi, .cdi, .m3u]
+    disc: cd
+  pcengine:
+    name: NEC PC Engine / TurboGrafx-16
+    extensions: [.pce]
+  pcenginecd:
+    name: NEC PC Engine CD / TurboGrafx-CD
+    extensions: [.chd, .cue, .bin, .m3u]
+    disc: cd
+  neogeo:
+    name: SNK Neo Geo
+    extensions: [.zip, .7z]
+    arcade: true
+  atari2600:
+    name: Atari 2600
+    extensions: [.a26, .bin]
+  atari5200:
+    name: Atari 5200
+    extensions: [.a52, .bin]
+  atari7800:
+    name: Atari 7800
+    extensions: [.a78, .bin]
+  lynx:
+    name: Atari Lynx
+    extensions: [.lnx, .lyx]
+    hooks: [lynx]
+  mame:
+    name: Arcade (MAME)
+    extensions: [.zip, .7z]
+    arcade: true
+  fbneo:
+    name: Arcade (FinalBurn Neo)
+    extensions: [.zip, .7z]
+    arcade: true

@@ -1,0 +1,15 @@
+<div id="job-status" {% if not terminal %}hx-get="/jobs/{{ job.id }}/status" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <dl class="kv">
+    <dt>Status</dt><dd><span class="badge s-{{ job.status }}">{{ job.status }}</span>
+      {% if not terminal %}<button class="danger" style="margin-left:.5rem;padding:.15rem .6rem" hx-post="/jobs/{{ job.id }}/cancel">Cancel</button>{% endif %}
+      {% if terminal %}<a class="small" href="/jobs/{{ job.id }}" style="margin-left:.5rem">reload for item table</a>{% endif %}</dd>
+    <dt>Created</dt><dd>{{ job.created_at }}</dd>
+    <dt>Started</dt><dd>{{ job.started_at or '—' }}</dd>
+    <dt>Ended</dt><dd>{{ job.ended_at or '—' }}</dd>
+    {% if job.error %}<dt>Error</dt><dd style="color:var(--bad)">{{ job.error }}</dd>{% endif %}
+  </dl>
+  {% if job.summary %}
+  <div class="totals">{% for k, v in job.summary.items() %}{% if v is number %}<span class="badge s-{{ k }}">{{ k }}: {{ v }}</span>{% endif %}{% endfor %}</div>
+  {% for k, v in job.summary.items() if v is not number %}<div class="small"><b>{{ k }}:</b> {{ v }}</div>{% endfor %}
+  {% endif %}
+</div>

@@ -1,0 +1,14 @@
+{% set good = rows | selectattr('ok') | list %}
+<div class="panel">
+  <h3 style="margin-top:0">Dry run: move to trash</h3>
+  <div class="totals">
+    <span class="badge warn">{{ good | length }} to trash</span>
+    <span class="badge">{{ good | sum(attribute='size') | size }}</span>
+    {% set bad = rows | rejectattr('ok') | list %}{% if bad %}<span class="badge bad">{{ bad | length }} not found</span>{% endif %}
+  </div>
+  <ul class="small">{% for r in rows %}<li>{{ r.name }} {% if not r.ok %}<span class="badge bad">missing</span>{% endif %}</li>{% endfor %}</ul>
+  {% if good %}
+  <p class="small muted">Files go to <code>_trash/&lt;timestamp&gt;/{{ key }}/</code> and can be restored from the Trash page.</p>
+  <button class="danger" type="button" hx-post="/system/{{ key }}/trash" hx-include="closest form">Move {{ good | length }} file(s) to trash</button>
+  {% endif %}
+</div>

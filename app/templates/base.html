@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Retro Library Manager{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header class="top"><div class="bar">
+  <a class="brand" href="/">Retro Library Manager</a>
+  {% set path = request.url.path %}
+  <nav>
+    <a href="/" class="{{ 'active' if path == '/' or path.startswith('/system') }}">Library</a>
+    <a href="/import" class="{{ 'active' if path.startswith('/import') or path.startswith('/extract') }}">Import</a>
+    <a href="/chd" class="{{ 'active' if path.startswith('/chd') }}">Disc → CHD</a>
+    <a href="/bios" class="{{ 'active' if path.startswith('/bios') }}">BIOS</a>
+    <a href="/arcade" class="{{ 'active' if path.startswith('/arcade') }}">Arcade</a>
+    <a href="/jobs" class="{{ 'active' if path.startswith('/jobs') }}">Jobs</a>
+    <a href="/trash" class="{{ 'active' if path.startswith('/trash') }}">Trash</a>
+    <a href="/settings" class="{{ 'active' if path.startswith('/settings') }}">Settings</a>
+  </nav>
+</div></header>
+<main>
+{% block content %}{% endblock %}
+</main>
+<footer class="muted small" style="text-align:center;padding:1rem">v{{ version }} · roms: <code>{{ state.cfg.paths.roms }}</code></footer>
+</body>
+</html>

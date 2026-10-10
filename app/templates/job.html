@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }} · Retro Library Manager{% endblock %}
+{% block content %}
+<h1>Job #{{ job.id }} · {{ job.title }}</h1>
+<div class="panel">
+  {% include "partials/job_status.html" %}
+  <details style="margin-top:.6rem"><summary class="small">Parameters</summary>
+    <pre>{{ job.params | tojson(indent=2) }}</pre></details>
+</div>
+
+<div class="row" style="align-items:center">
+  <h2 style="margin:.5rem 0">Log</h2>
+  <div class="shrink small"><label style="display:inline;font-weight:normal"><input type="checkbox" id="follow" checked> follow</label>
+    · <a href="/jobs/{{ job.id }}/log">download</a></div>
+</div>
+<pre class="log" id="log"></pre>
+
+{% if items %}
+<h2>Items <span class="muted small">({{ items | length }})</span></h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Name</th><th>Status</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for it in items[:5000] %}
+    <tr><td>{{ it.name }}</td><td><span class="badge s-{{ it.status }}">{{ it.status }}</span></td>
+      <td class="small">{{ it.detail or '' }}
+        {% if it.data.ratio is defined %}<div class="muted">{{ it.data.before | size }} → {{ it.data.after | size }} ({{ '%.1f' | format(it.data.ratio * 100) }}%)</div>{% endif %}
+        {% if it.data.stderr %}<pre style="margin:.3rem 0 0">{{ it.data.stderr }}</pre>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+
+<script>
+(() => {
+  const log = document.getElementById('log');
+  const follow = document.getElementById('follow');
+  const es = new EventSource('/jobs/{{ job.id }}/stream');
+  es.onmessage = (ev) => {
+    const lines = JSON.parse(ev.data);
+    log.append(document.createTextNode(lines.join('\n') + '\n'));
+    if (follow.checked) log.scrollTop = log.scrollHeight;
+  };
+  es.addEventListener('end', () => { es.close(); });
+  // Each connection replays the log from the start, so clear on (re)connect.
+  es.onopen = () => { log.textContent = ''; };
+})();
+</script>
+{% endblock %}

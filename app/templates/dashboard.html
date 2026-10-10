@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row" style="align-items:center">
+  <h1 style="margin:0">Library</h1>
+  <div class="shrink muted small">scanned {{ (now().timestamp() - scan.scanned_at) | int }}s ago ·
+    <a href="/?rescan=1">rescan</a></div>
+</div>
+
+{% set missing = scan.missing_sources %}
+{% if missing %}
+<div class="panel" style="margin-top:1rem">
+  <h2 style="margin-top:0">Missing sources <span class="badge warn">{{ missing | length }}</span></h2>
+  <p class="muted small">These systems have extracted games but no <code>_source/&lt;system&gt;-roms.zip</code>
+    and no per-game backups in <code>_source/&lt;system&gt;/</code>. This is the to-do list of lost source archives.</p>
+  <div class="totals">
+    {% for s in missing %}<a class="badge bad" href="/system/{{ s.key }}">{{ s.key }} · {{ s.game_count }} games</a>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if scan.unknown_folders %}
+<div class="flash warn">Folders not in systems.yaml (RetroBat may not show them):
+  {% for f in scan.unknown_folders %}<code>{{ f }}</code> {% endfor %}</div>
+{% endif %}
+
+<div class="grid" style="margin-top:1rem">
+{% for s in scan.systems if s.exists or s.has_source or s.bios_staged %}
+  {% set j = last_jobs.get(s.key) %}
+  <div class="card {{ 'flag' if s.flagged }}">
+    <div class="title"><a href="/system/{{ s.key }}">{{ s.key }}</a>
+      <span class="muted small">{{ s.name }}</span></div>
+    <div class="stats">
+      <span><b>{{ s.game_count }}</b> games</span>
+      <span><b>{{ s.bytes | size }}</b></span>
+    </div>
+    <div class="totals">
+      {% if s.source_archives %}<span class="badge ok" title="{{ s.source_archives | join(', ') }}">source ✓</span>
+      {% elif s.source_backups %}<span class="badge ok">{{ s.source_backups }} backups</span>
+      {% elif s.game_count %}<span class="badge bad">source missing</span>
+      {% else %}<span class="badge">no source</span>{% endif %}
+      {% if s.bios_staged %}<span class="badge warn">{{ s.bios_staged }} BIOS staged</span>{% endif %}
+      {% if s.disc %}<span class="badge">{{ s.disc }}</span>{% endif %}
+      {% if s.arcade %}<span class="badge">arcade</span>{% endif %}
+    </div>
+    {% if s.flagged %}
+    <div class="small" style="color:var(--warn)">
+      {% if s.archives_unexpected %}{{ s.archives_unexpected }} archive(s) where loose ROMs are expected. {% endif %}
+      {% for ext, n in s.unrecognized[:4] %}{{ n }}× <code>{{ ext }}</code> {% endfor %}unrecognized
+    </div>
+    {% endif %}
+    <div class="small muted">
+      {% if j %}last job: <a href="/jobs/{{ j.id }}">#{{ j.id }} {{ j.kind }}</a>
+        <span class="badge s-{{ j.status }}">{{ j.status }}</span>{% else %}no jobs yet{% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+
+{% set empty = scan.systems | rejectattr('exists') | rejectattr('has_source') | list %}
+{% if empty %}
+<p class="muted small" style="margin-top:1rem">Defined but empty: {% for s in empty %}<a href="/system/{{ s.key }}">{{ s.key }}</a>{{ ", " if not loop.last }}{% endfor %}</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,15 @@
+{% set q = '&target=' ~ target ~ '&pick=' ~ pick ~ '&exts=' ~ (exts | urlencode) %}
+<div class="picker">
+  <div class="muted small">{{ cur or 'roots' }}
+    {% if pick == 'dir' and cur %}<button type="button" style="float:right;padding:.1rem .5rem"
+      onclick="document.getElementById('{{ target }}').value={{ cur | tojson | forceescape }};this.closest('.picker').remove()">use this folder</button>{% endif %}
+  </div>
+  {% if parent is not none %}<a href="#" hx-get="/files/browse?path={{ parent | urlencode }}{{ q }}" hx-target="closest .picker" hx-swap="outerHTML">⬑ ..</a>{% endif %}
+  {% for e in entries %}
+    {% if e.dir %}
+      <a href="#" hx-get="/files/browse?path={{ e.path | urlencode }}{{ q }}" hx-target="closest .picker" hx-swap="outerHTML">📁 {{ e.name }}</a>
+    {% elif e.path %}
+      <a href="#" onclick="document.getElementById('{{ target }}').value={{ e.path | tojson | forceescape }};this.closest('.picker').remove();return false">📦 {{ e.name }} <span class="muted small">{{ e.size | size }}</span></a>
+    {% else %}<div class="muted">{{ e.name }}</div>{% endif %}
+  {% else %}<div class="muted">Empty.</div>{% endfor %}
+</div>

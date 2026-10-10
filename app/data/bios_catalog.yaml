@@ -1,0 +1,36 @@
+# BIOS catalog: what RetroBat expects in G:\RetroBat\bios.
+#
+#   system:      RetroBat system folder name
+#   file:        target filename, relative to the RetroBat bios folder
+#   md5:         expected MD5 (lower case). Empty = no fixed hash; matched by name.
+#   required:    true if the emulator will not run games without it
+#   note:        short description
+#
+# Extend this file, or import RetroBat's own BIOS definition file from the
+# BIOS page. Entries are keyed by (system, file); imports never remove entries.
+
+bios:
+  - {system: pcenginecd, file: syscard3.pce, md5: 38179df8f4ac870017db21ebcbf53114, required: true,
+     note: "Japanese Super CD-ROM System v3.0; works for US games"}
+  - {system: lynx, file: lynxboot.img, md5: fcd403db69f54290b51035d82f835e7b, required: true,
+     note: "Atari Lynx boot ROM"}
+  - {system: atari5200, file: 5200.rom, md5: 281f20ea4320404ec820fb7ec0693b38, required: true,
+     note: "Atari 5200 BIOS"}
+  - {system: atari7800, file: "7800 BIOS (U).rom", md5: 0763f1ffb006ddbe32e52d497ee848ae, required: false,
+     note: "Atari 7800 BIOS (USA)"}
+  - {system: atari7800, file: "7800 BIOS (E).rom", md5: 397bb566584be7b9764e7a68974c4263, required: false,
+     note: "Atari 7800 BIOS (Europe)"}
+  - {system: atari7800, file: ProSystem.dat, md5: ce6a86574d0c9de9075705f14e99d090, required: false,
+     note: "ProSystem cartridge database"}
+  - {system: gb, file: gb_bios.bin, md5: 32fbbd84168d3482956eb3c5051637f5, required: false,
+     note: "Game Boy boot ROM"}
+  - {system: gbc, file: gbc_bios.bin, md5: dbfce9db9deaa2567f6a84fde55f9680, required: false,
+     note: "Game Boy Color boot ROM"}
+  - {system: gba, file: gba_bios.bin, md5: a860e8c0b6d573d191e4ec7db1b1e4f6, required: false,
+     note: "Game Boy Advance BIOS"}
+  - {system: nds, file: bios7.bin, md5: df692a80a5b1bc90728bc3dfc76cd948, required: false,
+     note: "Nintendo DS ARM7 BIOS"}
+  - {system: nds, file: bios9.bin, md5: a392174eb3e572fed6447e956bde4b25, required: false,
+     note: "Nintendo DS ARM9 BIOS"}
+  - {system: nds, file: firmware.bin, md5: "", required: false,
+     note: "No fixed hash; prefer newest DS Lite (World) firmware"}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Trash · {{ name }}</h1>
+{% set conflicts = files | selectattr('conflict') | list %}
+<div class="panel">
+  <div class="totals">
+    <span class="badge">{{ files | length }} files</span>
+    <span class="badge">{{ files | sum(attribute='size') | size }}</span>
+    {% if conflicts %}<span class="badge warn">{{ conflicts | length }} already exist at the original path (restore skips them)</span>{% endif %}
+  </div>
+  {% if action == 'restore' %}
+    <p>Dry run: restoring will move <b>{{ files | length - conflicts | length }}</b> file(s) back to their original paths
+      and skip <b>{{ conflicts | length }}</b>.</p>
+    <form method="post" action="/trash/{{ name }}/restore"><button>Restore</button> <a href="/trash">cancel</a></form>
+  {% elif action == 'purge' %}
+    <div class="flash error">Dry run: purging permanently deletes <b>{{ files | length }}</b> file(s)
+      ({{ files | sum(attribute='size') | size }}). This cannot be undone.</div>
+    <form method="post" action="/trash/{{ name }}/purge"><button class="danger">Delete permanently</button> <a href="/trash">cancel</a></form>
+  {% else %}
+    <a class="btn" href="?action=restore">Restore…</a> <a class="btn danger" href="?action=purge">Purge…</a>
+  {% endif %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Original path</th><th class="num">Size</th><th></th></tr></thead>
+  <tbody>{% for f in files %}<tr><td>{{ f.rel }}</td><td class="num">{{ f.size | size }}</td>
+    <td>{% if f.conflict %}<span class="badge warn">exists</span>{% endif %}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endblock %}

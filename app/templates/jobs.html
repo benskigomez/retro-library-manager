@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Jobs</h1>
+<p class="muted small">Jobs run one at a time (configurable). Logs are kept in <code>_manager/logs/</code>.</p>
+<div hx-get="/jobs" hx-select="#job-table" hx-target="#job-table" hx-swap="outerHTML" hx-trigger="every 5s">
+<div id="job-table">{% include "partials/job_table.html" %}</div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ sysdef.key }} · Retro Library Manager{% endblock %}
+{% block content %}
+<h1>{{ sysdef.name }} <span class="muted small">/{{ sysdef.key }}</span></h1>
+{% if request.query_params.get('trashed') %}
+<div class="flash ok">Moved {{ request.query_params.get('trashed') }} file(s) to the trash. <a href="/trash">Open trash</a></div>
+{% endif %}
+<div class="panel">
+  <dl class="kv">
+    <dt>Games</dt><dd>{{ status.game_count }} ({{ status.file_count }} files, {{ status.bytes | size }})</dd>
+    <dt>Extensions</dt><dd>{% for e in sysdef.extensions %}<code>{{ e }}</code> {% endfor %}</dd>
+    <dt>Type</dt><dd>{% if sysdef.arcade %}arcade (sets copied as-is){% elif sysdef.disc %}disc ({{ sysdef.disc }}, chdman create{{ sysdef.disc }}){% else %}cartridge{% endif %}
+      {% if sysdef.hooks %} · hooks: {{ sysdef.hooks | join(', ') }}{% endif %}</dd>
+    <dt>Source</dt><dd>{% if status.source_archives %}{% for a in status.source_archives %}<code>_source/{{ a }}</code> {% endfor %}{% else %}<span class="badge bad">no &lt;system&gt;-roms archive</span>{% endif %}
+      {% if status.source_backups %} · {{ status.source_backups }} per-game backups in <code>_source/{{ sysdef.key }}/</code>{% endif %}</dd>
+    <dt>BIOS staged</dt><dd>{{ status.bios_staged }} <a href="/bios">BIOS manager</a></dd>
+    <dt>Filters</dt><dd>
+      {% if filters %}override: include {{ 'custom' if filters.include is not none else 'global' }},
+        exclude {{ 'custom' if filters.exclude is not none else 'global' }},
+        {{ filters.allow | length }} allow, {{ filters.deny | length }} deny{% else %}global rules{% endif %}
+      · <a href="/settings/filters/{{ sysdef.key }}">edit</a></dd>
+  </dl>
+  <div class="row" style="margin-top:.8rem">
+    <div class="shrink"><a class="btn" href="/import?system={{ sysdef.key }}">Import / extract</a></div>
+    {% if sysdef.disc %}<div class="shrink"><a class="btn secondary" href="/chd?system={{ sysdef.key }}">Disc → CHD</a></div>{% endif %}
+    {% if 'lynx' in sysdef.hooks %}<div class="shrink"><a class="btn secondary" href="/extract/lynx">Lynx headers</a></div>{% endif %}
+  </div>
+</div>
+
+{% if status.flagged %}
+<div class="flash warn">
+  {% if status.archives_unexpected %}{{ status.archives_unexpected }} archive file(s) where loose ROMs are expected.{% endif %}
+  {% for ext, n in status.unrecognized %}{{ n }}× <code>{{ ext }}</code>{{ ", " if not loop.last }}{% endfor %}
+  {% if status.unrecognized %} not in this system's extension list.{% endif %}
+  <a href="?show=flagged">Show only these</a>
+</div>
+{% endif %}
+
+<h2>Recent jobs</h2>
+{% include "partials/job_table.html" %}
+
+<h2>Files {% if show == 'flagged' %}<span class="muted small">(non-game only · <a href="?">show all</a>)</span>{% endif %}</h2>
+<form hx-post="/system/{{ sysdef.key }}/trash/preview" hx-target="#trash-preview">
+  <div class="row"><div class="shrink"><button class="secondary" type="submit">Preview move selected to trash</button></div></div>
+  <div id="trash-preview"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th></th><th>Name</th><th class="num">Size</th><th>Kind</th></tr></thead>
+    <tbody>
+    {% for f in files[:3000] %}
+      <tr><td><input type="checkbox" name="names" value="{{ f.name }}"></td><td>{{ f.name }}</td>
+        <td class="num">{{ f.size | size }}</td><td><span class="badge {{ 'ok' if f.kind == 'game' else 'warn' }}">{{ f.kind }}</span></td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No files.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if files | length > 3000 %}<p class="muted small">Showing the first 3000 of {{ files | length }} files.</p>{% endif %}
+</form>
+{% endblock %}

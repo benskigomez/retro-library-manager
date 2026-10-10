@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Trash</h1>
+{% if msg %}<div class="flash ok">{{ msg }}</div>{% endif %}
+<p class="muted small">Anything the app removes goes to <code>_trash/&lt;timestamp&gt;/</code> with its path relative to the ROM share.
+  Restore never overwrites an existing file. Purge is the only permanent delete.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Batch</th><th class="num">Files</th><th class="num">Size</th><th></th></tr></thead>
+  <tbody>
+  {% for b in batches %}
+    <tr><td><a href="/trash/{{ b.name }}">{{ b.name }}</a></td><td class="num">{{ b.count }}</td><td class="num">{{ b.size | size }}</td>
+      <td><a href="/trash/{{ b.name }}?action=restore">restore…</a> · <a href="/trash/{{ b.name }}?action=purge" style="color:var(--bad)">purge…</a></td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Trash is empty.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

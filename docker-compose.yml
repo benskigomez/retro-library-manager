@@ -1,0 +1,21 @@
+services:
+  retro-library-manager:
+    image: ghcr.io/benskigomez/retro-library-manager:latest
+    build: .
+    container_name: retro-library-manager
+    user: "99:100"
+    ports:
+      - "8787:8787"
+    environment:
+      TZ: America/Chicago
+      # Initial login (only used while config.yaml has no password hash yet).
+      RLM_USERNAME: admin
+      RLM_PASSWORD: change-me
+    volumes:
+      # RetroBat ROM share. Config, SQLite DB and logs live in /roms/_manager.
+      - /mnt/user/roms:/roms
+      # Scratch space for extraction / CHD conversion: put it on fast storage.
+      - /mnt/cache/appdata/retro-library-manager/tmp:/tmp/rlm
+      # Optional: the desktop's G:\RetroBat\bios mounted via Unassigned Devices (BIOS "mounted" mode).
+      # - /mnt/remotes/DESKTOP_bios:/desktop_bios
+    restart: unless-stopped

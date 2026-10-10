@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Filter rules · <a href="/system/{{ key }}">{{ key }}</a></h1>
+{% if request.query_params.get('saved') %}<div class="flash ok">Saved.</div>{% endif %}
+<p class="muted small">Rules match the entry's base filename (never its folder). Order: <b>[BIOS] prefix</b> → <b>deny</b> → <b>allow</b>
+  → <b>exclude</b> → <b>include</b> → otherwise excluded. Allow/deny entries are case-insensitive substrings, or regexes when prefixed with <code>re:</code>.</p>
+<div class="panel">
+<form class="stack" style="max-width:none" hx-post="/settings/filters/{{ key }}" hx-target="#save-result">
+  <div class="row">
+    <div>
+      <label><input type="checkbox" name="override_include" value="1" {{ 'checked' if o and o.include is not none }}> Override include patterns (regex, one per line)</label>
+      <textarea name="include" style="min-height:7rem">{{ ((o.include if o and o.include is not none else g.include) or []) | join('\n') }}</textarea>
+    </div>
+    <div>
+      <label><input type="checkbox" name="override_exclude" value="1" {{ 'checked' if o and o.exclude is not none }}> Override exclude patterns (regex, one per line)</label>
+      <textarea name="exclude" style="min-height:7rem">{{ ((o.exclude if o and o.exclude is not none else g.exclude) or []) | join('\n') }}</textarea>
+    </div>
+  </div>
+  <div class="row">
+    <div><label>Allow-list (always include)</label>
+      <textarea name="allow" style="min-height:7rem" placeholder="Terranigma (Europe)">{{ (o.allow if o else []) | join('\n') }}</textarea></div>
+    <div><label>Deny-list (never include)</label>
+      <textarea name="deny" style="min-height:7rem">{{ (o.deny if o else []) | join('\n') }}</textarea></div>
+  </div>
+  <div><button type="submit">Save</button></div>
+  <div id="save-result"></div>
+</form>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Test file names</h2>
+  <form class="stack" style="max-width:none" hx-post="/settings/filters/{{ key }}/test" hx-target="#test-result">
+    <textarea name="names" style="min-height:6rem" placeholder="Tetris (World) (Rev 1).gb"></textarea>
+    <div><button type="submit" class="secondary">Test with saved rules</button></div>
+  </form>
+  <div id="test-result"></div>
+</div>
+{% endblock %}

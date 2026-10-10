@@ -1,0 +1,16 @@
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Job</th><th class="hide-sm">System</th><th>Status</th><th class="hide-sm">Started</th><th class="hide-sm">Ended</th><th>Summary</th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+    <tr>
+      <td><a href="/jobs/{{ j.id }}">{{ j.id }}</a></td>
+      <td><a href="/jobs/{{ j.id }}">{{ j.title }}</a><div class="muted small">{{ j.kind }}</div></td>
+      <td class="hide-sm">{{ j.system or '' }}</td>
+      <td><span class="badge s-{{ j.status }}">{{ j.status }}</span></td>
+      <td class="hide-sm small">{{ j.started_at or j.created_at }}</td>
+      <td class="hide-sm small">{{ j.ended_at or '' }}</td>
+      <td class="small">{% for k, v in j.summary.items() if v is number %}{{ k }}: {{ v }}{{ ", " if not loop.last }}{% endfor %}</td>
+    </tr>
+  {% else %}<tr><td colspan="7" class="muted">No jobs.</td></tr>{% endfor %}
+  </tbody>
+</table></div>

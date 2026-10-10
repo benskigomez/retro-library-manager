@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Settings</h1>
+<div class="totals">
+  {% for key, (fname, _) in files.items() %}
+  <a class="badge {{ 'ok' if key == which }}" href="/settings?which={{ key }}">{{ fname }}</a>
+  {% endfor %}
+</div>
+{% if saved %}<div class="flash ok">Saved. The previous version was kept as a <code>.bak-&lt;timestamp&gt;</code> file.</div>{% endif %}
+{% if error %}<div class="flash error"><b>Not saved:</b> <pre style="margin:.3rem 0 0;background:none;padding:0">{{ error }}</pre></div>{% endif %}
+
+<div class="panel">
+  <form method="post" action="/settings/{{ which }}" class="stack" style="max-width:none">
+    <p class="muted small" style="margin:0">
+      {% if which == 'config' %}Paths, tools, ownership, filter rules and Lynx options. Per-system filters are easier to edit from each system's
+      <a href="/">library page</a> (Filters → edit).
+      {% elif which == 'systems' %}RetroBat system folders. Keys must match RetroBat folder names exactly.
+      {% else %}BIOS catalog. You can also import RetroBat's BIOS definition file from the <a href="/bios">BIOS page</a>.{% endif %}
+      Edited files are validated before saving and backed up next to the original.
+    </p>
+    <textarea name="text" spellcheck="false" style="min-height:60vh">{{ text }}</textarea>
+    <div><button type="submit">Validate and save</button></div>
+  </form>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Change password</h2>
+  <form class="stack" hx-post="/settings/password/change" hx-target="#pw-result">
+    <div class="row">
+      <div><label>Current</label><input type="password" name="current" autocomplete="current-password" required></div>
+      <div><label>New</label><input type="password" name="new" autocomplete="new-password" required minlength="8"></div>
+      <div><label>Confirm</label><input type="password" name="confirm" autocomplete="new-password" required minlength="8"></div>
+    </div>
+    <div><button type="submit">Change password</button></div>
+    <div id="pw-result"></div>
+  </form>
+  <p class="muted small">User name: <code>{{ state.cfg.auth.username }}</code> (change <code>auth.username</code> above, or set <code>RLM_USERNAME</code>).</p>
+</div>
+{% endblock %}

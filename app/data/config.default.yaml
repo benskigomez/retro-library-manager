@@ -1,0 +1,56 @@
+# Retro Library Manager configuration.
+# Lives at /roms/_manager/config.yaml (seeded from this file on first run).
+# Edit here or on the Settings page; the app validates and backs up on save.
+
+paths:
+  roms: /roms                  # the RetroBat ROM share (/mnt/user/roms on Unraid)
+  temp: /tmp/rlm               # scratch space; map to fast storage (cache/SSD) for CHD work
+  desktop_bios: ""             # optional mount of G:\RetroBat\bios (e.g. /desktop_bios); "" = export mode only
+  browse_roots: []             # extra container paths the file picker may browse (e.g. /import)
+
+auth:
+  username: admin
+  password_hash: ""            # set on first run from RLM_PASSWORD, or a random password printed to the log
+
+jobs:
+  workers: 1                   # jobs run one at a time by default
+
+stability:
+  wait_seconds: 5              # an archive must keep the same size/mtime across this gap before it is read
+
+ownership:
+  apply: true
+  uid: 99                      # nobody
+  gid: 100                     # users
+
+tools:
+  sevenzip: 7zz
+  chdman: chdman
+  unzip: unzip
+  zip_backend: python          # python (zipfile) or unzip (Info-ZIP, member names glob-escaped)
+
+ignore_extensions: [.txt, .nfo, .diz, .url, .sfv, .md5]
+
+filters:
+  bios_prefix: "[BIOS]"
+  include:
+    - '\(([^)]*, )?(USA|World)(, [^)]*)?\)'    # No-Intro/Redump: (USA), (World), (USA, Europe), (Japan, USA)
+    - '\(Japan\) \(En[,)]'                     # Japanese releases already in English
+    - '\((U|W|JU|UE|JUE)\)'                    # GoodTools region codes
+  exclude:
+    - '\((Proto|Beta|Demo|Pirate|Unl|Aftermarket|Sample|Program)[^)]*\)'
+  # Per-system overrides. include/exclude replace the global list when set;
+  # allow/deny are title matches (case-insensitive substring of the file name,
+  # or a regex when prefixed with "re:"). allow wins over region/exclude rules,
+  # deny wins over everything except BIOS staging.
+  systems: {}
+  #  snes:
+  #    allow: ["Terranigma (Europe)"]
+  #    deny: ["re:^Super Mario World \\(USA\\) \\(Beta"]
+
+lynx:
+  manufacturer: ""             # 16-byte manufacturer field written into generated LNX headers
+  rotation: {}                 # per-game override, keyed by title prefix: left | right
+  #  "Gauntlet - The Third Encounter": left
+  #  "Klax": left
+  #  "Lexis": right
