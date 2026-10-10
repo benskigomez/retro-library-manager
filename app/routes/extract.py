@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from .. import archives, fsutil
-from ..extract import plan as make_plan, source_name
+from ..extract import import_targets, plan as make_plan
 from ..hooks import lynx
 from ..systems import detect_system
 from . import redirect, render, st
@@ -84,10 +84,12 @@ def plan_view(request: Request, path: str = Form(...), system: str = Form(...),
     sysdef = s.system(system)
     plan = make_plan(s.cfg, sysdef, p)
     rows = [r for r in plan.rows if not show or r.decision == show]
-    target_source = s.cfg.source_dir / source_name(system, p)
+    main, extra = import_targets(s.cfg, system, p)
+    target_source = extra if main.exists() else main
     return render(request, "partials/plan.html", plan=plan, rows=rows[:MAX_ROWS], total_rows=len(rows),
                   show=show, path=str(p), system=system, sysdef=sysdef, import_mode=import_mode,
-                  target_source=target_source, source_exists=target_source.exists())
+                  target_source=target_source, main_source=main, main_exists=main.exists(),
+                  source_exists=target_source.exists())
 
 
 @router.get("/extract/plan.csv")

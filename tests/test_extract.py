@@ -284,12 +284,25 @@ def test_import_copy_into_source(state, roms):
     job = submit(state, src, "gb", import_mode="copy")
     assert job["status"] == "done", job
     assert (roms / "_source" / "gb-roms.zip").exists() and src.exists()
-    # a different archive with the same target name is refused, not overwritten
+    # a second, different archive for the same system goes to _source/<system>/<its name>;
+    # the existing gb-roms.zip is never modified
     other = make_zip(roms / "incoming" / "other.zip", {"Other (USA).gb": ROM})
     job = submit(state, other, "gb", import_mode="copy")
-    assert job["status"] == "failed" and "already exists" in job["error"]
+    assert job["status"] == "done", job
+    assert (roms / "_source" / "gb" / "other.zip").read_bytes() == other.read_bytes()
+    assert (roms / "gb" / "Other (USA).gb").exists()
     with zipfile.ZipFile(roms / "_source" / "gb-roms.zip") as zf:
         assert zf.namelist() == ["Tetris (World).gb"]
+    # identical copies are recognised in either place, not duplicated
+    job = submit(state, src, "gb", import_mode="copy")
+    assert job["status"] == "done" and not job["summary"].get("imported")
+    job = submit(state, other, "gb", import_mode="copy")
+    assert job["status"] == "done" and not job["summary"].get("imported")
+    # same name, different content in _source/gb/: refused before extracting anything
+    clash = make_zip(roms / "incoming2" / "other.zip", {"Clash (USA).gb": ROM})
+    job = submit(state, clash, "gb", import_mode="copy")
+    assert job["status"] == "failed" and "not overwriting" in job["error"]
+    assert not (roms / "gb" / "Clash (USA).gb").exists()
 
 
 def test_import_move(state, roms):
@@ -328,3 +341,6 @@ def test_plan_view_and_csv(client, roms):
     csv = client.get("/extract/plan.csv", params={"path": path, "system": "gb"}).text
     assert "Tetris (World).gb" in csv and "region (World)" in csv
     assert client.post("/import/inspect", data={"path": "/etc/passwd"}).status_code == 403
+    extra = make_zip(roms / "incoming" / "more gb.zip", {"Other (USA).gb": ROM})
+    r = client.post("/extract/plan", data={"path": str(extra), "system": "gb", "import_mode": "copy"})
+    assert "_source/gb/more gb.zip" in r.text and "not touched" in r.text

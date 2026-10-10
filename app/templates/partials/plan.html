@@ -16,11 +16,15 @@
   </form>
 
   {% if import_mode != 'none' %}
-    {% if source_exists %}
-    <div class="flash warn"><code>_source/{{ target_source.name }}</code> already exists. The job will use it if it is byte-identical,
-      otherwise it stops before extracting anything (never overwrites). Choose "Don't import" to extract from the original path.</div>
+    {% set rel = target_source.relative_to(state.cfg.source_dir).as_posix() %}
+    {% if main_exists %}
+    <div class="flash ok"><code>_source/{{ main_source.name }}</code> already exists, so this archive will be
+      {{ 'copied' if import_mode == 'copy' else 'moved' }} to <code>_source/{{ rel }}</code> (verified) — the existing source archive is not touched.
+      If it is byte-identical to <code>{{ main_source.name }}</code>, that file is used instead.
+      {% if source_exists %}<br><b>Note:</b> <code>_source/{{ rel }}</code> also exists already: it is used if identical, otherwise the job stops
+      before extracting anything (never overwrites).{% endif %}</div>
     {% else %}
-    <div class="flash ok">The archive will be {{ 'copied' if import_mode == 'copy' else 'moved' }} to <code>_source/{{ target_source.name }}</code> and verified first.</div>
+    <div class="flash ok">The archive will be {{ 'copied' if import_mode == 'copy' else 'moved' }} to <code>_source/{{ rel }}</code> and verified first.</div>
     {% endif %}
   {% endif %}
 

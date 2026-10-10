@@ -560,31 +560,54 @@ def source_name(system: str, archive: Path) -> str:
     return f"{system}-roms{Path(archive).suffix.lower()}"
 
 
+def import_targets(cfg: Config, system: str, archive: Path) -> tuple[Path, Path]:
+    """(main source name, where an additional archive for the same system goes)."""
+    archive = Path(archive)
+    return cfg.source_dir / source_name(system, archive), cfg.source_dir / system / archive.name
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    return a.stat().st_size == b.stat().st_size and fsutil.md5_file(a) == fsutil.md5_file(b)
+
+
 def import_archive(ctx, cfg: Config, system: str, archive: Path, mode: str) -> Path:
-    """Store an archive in _source as <system>-roms.<ext>. Returns the path to extract from.
+    """Store an archive in _source. Returns the path to extract from.
+
+    The first archive for a system becomes _source/<system>-roms.<ext>. When that
+    already exists with different content, the new archive is stored as
+    _source/<system>/<its own name> instead; existing source archives are never
+    modified or overwritten. An identical copy already in either place is reused.
 
     mode: "none" (extract in place), "copy", or "move" (copy-verify-remove).
-    _source is never modified except for adding the new archive.
     """
     archive = Path(archive)
     if mode == "none":
         return archive
-    dest = cfg.source_dir / source_name(system, archive)
-    if archive.resolve() == dest.resolve():
-        ctx.log(f"{archive.name} is already the source archive for {system}")
-        return dest
-    if fsutil.is_within(archive, cfg.source_dir) and mode == "move":
-        raise RuntimeError("refusing to move a file that is already inside _source; use copy")
-    if dest.exists():
-        if dest.stat().st_size == archive.stat().st_size and fsutil.md5_file(dest) == fsutil.md5_file(archive):
-            ctx.log(f"_source/{dest.name} already exists with identical content; using it")
-            return dest
-        raise RuntimeError(
-            f"_source/{dest.name} already exists with different content; not overwriting. "
-            "Extract without importing, or rename the existing archive yourself."
-        )
-    fsutil.ensure_dir(cfg.source_dir)
-    ctx.log(f"Importing {archive} -> _source/{dest.name} ({mode})")
+    if fsutil.is_within(archive, cfg.source_dir):
+        if mode == "move":
+            raise RuntimeError("refusing to move a file that is already inside _source; use copy")
+        ctx.log(f"{archive.name} is already inside _source; using it where it is")
+        return archive
+    main, extra = import_targets(cfg, system, archive)
+    dest = main
+    if main.exists():
+        if _same_file(main, archive):
+            ctx.log(f"_source/{main.name} already exists with identical content; using it")
+            return main
+        dest = extra
+        ctx.log(f"_source/{main.name} already exists (different content); storing this archive as "
+                f"_source/{system}/{archive.name}")
+        if extra.exists():
+            if _same_file(extra, archive):
+                ctx.log(f"_source/{system}/{archive.name} already exists with identical content; using it")
+                return extra
+            raise RuntimeError(
+                f"_source/{system}/{archive.name} already exists with different content; not overwriting. "
+                "Rename the new archive, or extract it without importing."
+            )
+    fsutil.ensure_dir(dest.parent)
+    rel = dest.relative_to(cfg.source_dir).as_posix()
+    ctx.log(f"Importing {archive} -> _source/{rel} ({mode})")
     if mode == "move":
         fsutil.safe_move(archive, dest, ctx.check)
     else:

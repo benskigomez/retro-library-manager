@@ -9,6 +9,8 @@ A self-hosted web app for a RetroBat (EmulationStation) ROM library kept on an U
 - **Arcade tools**: import MAME `-listxml`. Verify sets by CRC32, including parents, BIOS and device sets. Classify sets as game, clone, BIOS, device or mechanical, hide non-games in `gamelist.xml`, look up short names, and install BIOS/device bundles.
 - **Jobs**: a persistent SQLite queue that runs one job at a time, with live logs over Server-Sent Events, cancel, and a history page.
 
+**Where imports go.** The first archive imported for a system becomes `_source/<system>-roms.zip`. Later archives for the same system are stored next to it as `_source/<system>/<their own name>`. Existing source archives are never added to or modified, and an identical copy already in either place is reused instead of duplicated. All of them show up on the **Source** page.
+
 Safety is the design priority. `_source` is never modified apart from adding newly imported archives. Existing files are never overwritten. Anything removed goes to `_trash/<timestamp>/`, where it can be restored. Every bulk action has a dry run first. Archives are checked for completeness before they are read. `gamelist.xml` is backed up before any edit, and you must confirm RetroBat is closed. Moves between shares copy, verify, then delete.
 
 ---
