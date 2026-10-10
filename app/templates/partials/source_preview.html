@@ -17,7 +17,8 @@
       {% if totals.get('skipped') %}<span class="badge bad">{{ totals.get('skipped') }} skipped</span>{% endif %}
     </div>
     <ul class="small">{% for r in rows %}<li>{{ r.base }} — <span class="badge s-{{ r.decision }}">{{ r.decision }}</span> <span class="muted">{{ r.rule }}</span></li>{% endfor %}</ul>
-    {% if mode == 'chd' %}<p class="small muted">Per-game archives are converted with chdman; loose disc files are copied as-is. No extra backup is made — the source archive is the backup.</p>{% endif %}
+    {% if mode == 'chd' %}<p class="small muted">Disc games (per-game archives, .cue/.gdi sets, .iso) are converted with chdman. No extra backup is made — the source archive is the backup.</p>
+    {% elif sysdef and sysdef.disc %}<p class="small muted">Disc games are copied as their original files; each .cue/.gdi with all of its tracks, or not at all.</p>{% endif %}
     {% if totals.get('include') or totals.get('bios') %}
     <form method="post" action="/source/run">
       <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ system }}">

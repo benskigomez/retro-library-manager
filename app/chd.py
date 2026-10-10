@@ -116,23 +116,31 @@ def discover(cfg: Config, sysdef: System, input_path: Path) -> list[Game]:
 _FILE_RE = re.compile(r'^\s*FILE\s+(?:"([^"]+)"|(\S+))', re.I)
 
 
+def descriptor_refs(text: str, ext: str) -> list[str]:
+    """Track file names referenced by a .cue or .gdi sheet."""
+    out: list[str] = []
+    if ext == ".cue":
+        for line in text.splitlines():
+            m = _FILE_RE.match(line)
+            if m:
+                out.append(m.group(1) or m.group(2))
+    elif ext == ".gdi":
+        for line in text.splitlines()[1:]:
+            try:
+                parts = shlex.split(line) if line.strip() else []
+            except ValueError:
+                parts = line.split()
+            if len(parts) >= 5:
+                out.append(parts[4])
+    return out
+
+
 def cue_files(cue: Path) -> list[str]:
-    files = []
-    for line in cue.read_text(encoding="utf-8", errors="replace").splitlines():
-        m = _FILE_RE.match(line)
-        if m:
-            files.append(m.group(1) or m.group(2))
-    return files
+    return descriptor_refs(cue.read_text(encoding="utf-8", errors="replace"), ".cue")
 
 
 def gdi_files(gdi: Path) -> list[str]:
-    out = []
-    lines = gdi.read_text(encoding="utf-8", errors="replace").splitlines()[1:]
-    for line in lines:
-        parts = shlex.split(line) if line.strip() else []
-        if len(parts) >= 5:
-            out.append(parts[4])
-    return out
+    return descriptor_refs(gdi.read_text(encoding="utf-8", errors="replace"), ".gdi")
 
 
 def resolve_tracks(desc: Path) -> tuple[list[Path], list[str]]:

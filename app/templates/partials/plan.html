@@ -8,7 +8,7 @@
     <input type="hidden" name="import_mode" value="{{ import_mode }}">
     <div class="totals">
       <button name="show" value="" class="badge {{ 'ok' if not show }}" style="border:0">all {{ plan.rows | length }}</button>
-      {% for d in ['include', 'present', 'exclude', 'bios', 'skipped'] %}
+      {% for d in ['include', 'present', 'exclude', 'bios', 'skipped', 'part'] %}
         <button name="show" value="{{ d }}" class="badge s-{{ d }}" style="border:{{ '2px solid currentColor' if show == d else '0' }}">{{ d }} {{ t.get(d, 0) }}</button>
       {% endfor %}
       <a class="badge" href="/extract/plan.csv?path={{ path | urlencode }}&system={{ system }}">download CSV</a>
@@ -27,6 +27,14 @@
   <form method="post" action="/extract/run" style="margin:.6rem 0">
     <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ system }}">
     <input type="hidden" name="import_mode" value="{{ import_mode }}">
+    {% if sysdef.disc %}
+    <p><label style="display:inline">Disc games:</label>
+      <select name="disc_mode" style="width:auto;display:inline-block">
+        <option value="chd" {{ 'selected' if sysdef.prefers_chd }}>convert to CHD</option>
+        <option value="original" {{ 'selected' if not sysdef.prefers_chd }}>copy original files (.cue/.bin/.iso)</option>
+      </select>
+      <span class="small muted">default from systems.yaml <code>prefer</code>; a .cue always travels with all of its tracks</span></p>
+    {% endif %}
     <button type="submit" {{ 'disabled' if not (t.get('include', 0) or t.get('bios', 0) or import_mode != 'none') }}>
       Run: add {{ t.get('include', 0) }}{{ ' game(s)' }}, stage {{ t.get('bios', 0) }} BIOS</button>
     <span class="small muted">existing files are never overwritten; the job re-plans against the disk when it starts</span>

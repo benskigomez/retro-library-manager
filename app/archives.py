@@ -92,7 +92,23 @@ def list_7z(path: Path) -> list[Entry]:
                 for i in z.list()]
 
 
+def list_dir(path: Path) -> list[Entry]:
+    """A folder used as a source: every non-hidden file, "/"-separated relative names."""
+    path = Path(path)
+    out = []
+    for root, dirs, files in os.walk(path):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        for f in sorted(files):
+            if f.startswith("."):
+                continue
+            p = Path(root) / f
+            out.append(Entry(str(p.relative_to(path)).replace("\\", "/"), p.stat().st_size))
+    return out
+
+
 def list_entries(path: Path) -> list[Entry]:
+    if Path(path).is_dir():
+        return list_dir(path)
     suffix = Path(path).suffix.lower()
     if suffix == ".zip":
         return list_zip(path)
@@ -161,6 +177,14 @@ def extract_all(archive: Path, dest_dir: Path) -> None:
 def stream_member(archive: Path, member: str, chunk: int = 1024 * 1024):
     """Yield one member's bytes without writing anything to disk (7z: via `7zz -so`)."""
     archive = Path(archive)
+    if archive.is_dir():
+        target = archive / member
+        if not fsutil.is_within(target, archive):
+            raise ValueError(f"unsafe path: {member}")
+        with open(target, "rb") as f:
+            while data := f.read(chunk):
+                yield data
+        return
     if archive.suffix.lower() == ".zip":
         with zipfile.ZipFile(archive) as zf, zf.open(member) as src:
             while data := src.read(chunk):
@@ -176,6 +200,8 @@ def stream_member(archive: Path, member: str, chunk: int = 1024 * 1024):
             while data := proc.stdout.read(chunk):
                 yield data
         finally:
+            if proc.poll() is None:
+                proc.kill()  # the reader stopped early (e.g. read_member with a limit)
             proc.stdout.close()
             proc.wait()
         return
@@ -192,6 +218,20 @@ def stream_member(archive: Path, member: str, chunk: int = 1024 * 1024):
         with open(target, "rb") as f:
             while data := f.read(chunk):
                 yield data
+
+
+def read_member(source: Path, member: str, limit: int = 1024 * 1024) -> bytes:
+    """The first ``limit`` bytes of a member (headers, .cue sheets)."""
+    buf = bytearray()
+    gen = stream_member(source, member, chunk=min(limit, 1024 * 1024))
+    try:
+        for data in gen:
+            buf += data
+            if len(buf) >= limit:
+                break
+    finally:
+        gen.close()
+    return bytes(buf[:limit])
 
 
 # ---- inspection --------------------------------------------------------------

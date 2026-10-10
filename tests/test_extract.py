@@ -116,11 +116,83 @@ def test_rerun_is_idempotent_and_dedupes_by_stem(state, settings, roms):
     assert (roms / "gba" / "A (USA).sav").read_bytes() == b"save"
 
 
-def test_same_stem_different_extension_inside_one_archive(state, roms):
-    src = make_zip(roms / "psx.zip", {"Game (USA).cue": b"FILE", "Game (USA).bin": b"\0" * 2352})
-    job = submit(state, src, "psx")
-    assert job["summary"]["added"] == 2
-    assert {p.name for p in (roms / "psx").iterdir()} == {"Game (USA).cue", "Game (USA).bin"}
+def submit_opts(state, archive, system, **extra):
+    params = {"archive": str(archive), "system": system, "import_mode": "none"} | extra
+    return run_job(state, state.queue.submit("extract", "t", params, system=system))
+
+
+CUE2 = b'FILE "Game (USA) (Track 1).bin" BINARY\n  TRACK 01 MODE2/2352\nFILE "Game (USA) (Track 2).bin" BINARY\n  TRACK 02 AUDIO\n'
+
+
+def test_disc_set_copied_whole_when_copying_originals(state, roms):
+    src = make_zip(roms / "psx.zip", {"PSX/Game (USA).cue": CUE2, "PSX/Game (USA) (Track 1).bin": b"\0" * 2352,
+                                      "PSX/Game (USA) (Track 2).bin": b"\1" * 2352})
+    p = extract.plan(state.cfg, state.system("psx"), src)
+    assert p.totals == {"include": 1, "part": 2}  # one game, its tracks travel with it
+    job = submit_opts(state, src, "psx", convert=False)
+    assert job["summary"]["added"] == 1, state.queue.items(job["id"])
+    assert {f.name for f in (roms / "psx").iterdir()} == {
+        "Game (USA).cue", "Game (USA) (Track 1).bin", "Game (USA) (Track 2).bin"}
+
+
+def test_selecting_a_cue_brings_its_tracks(state, roms):
+    src = make_zip(roms / "psx.zip", {"Game (USA).cue": CUE2, "Game (USA) (Track 1).bin": b"\0",
+                                      "Game (USA) (Track 2).bin": b"\1"})
+    p = extract.plan(state.cfg, state.system("psx"), src, select={"Game (USA).cue"})
+    assert sorted(r.entry for r in p.rows) == ["Game (USA) (Track 1).bin", "Game (USA) (Track 2).bin", "Game (USA).cue"]
+    # ...and ticking only a track brings the sheet and the other track
+    p = extract.plan(state.cfg, state.system("psx"), src, select={"Game (USA) (Track 2).bin"})
+    assert len(p.rows) == 3
+
+
+def test_incomplete_or_mixed_disc_sets_are_refused(state, roms):
+    src = make_zip(roms / "psx.zip", {"Game (USA).cue": CUE2, "Game (USA) (Track 1).bin": b"\0"})
+    p = extract.plan(state.cfg, state.system("psx"), src)
+    assert p.rows[0].decision == "skipped" and "Track 2" in p.rows[0].rule
+    (roms / "psx").mkdir()
+    (roms / "psx" / "Game (USA) (Track 2).bin").write_bytes(b"old")
+    src2 = make_zip(roms / "psx2.zip", {"Game (USA).cue": CUE2, "Game (USA) (Track 1).bin": b"\0",
+                                        "Game (USA) (Track 2).bin": b"\1"})
+    p = extract.plan(state.cfg, state.system("psx"), src2)
+    assert p.rows[0].decision == "skipped" and "not mixing" in p.rows[0].rule
+    job = submit_opts(state, src2, "psx", convert=False)
+    assert job["summary"].get("added", 0) == 0
+    assert sorted(f.name for f in (roms / "psx").iterdir()) == ["Game (USA) (Track 2).bin"]
+
+
+def test_clonecd_layout_is_not_partially_copied(state, roms):
+    src = make_zip(roms / "psx.zip", {"Clone (USA).ccd": b"[CloneCD]", "Clone (USA).img": b"\0" * 2352,
+                                      "Clone (USA).sub": b"\0"})
+    p = extract.plan(state.cfg, state.system("psx"), src)
+    assert {r.decision for r in p.rows} == {"skipped"}
+    assert any("CloneCD" in r.rule for r in p.rows)
+    submit_opts(state, src, "psx", convert=False)
+    assert not (roms / "psx").exists() or not any((roms / "psx").iterdir())
+
+
+def test_inner_disc_zip_copied_whole_or_refused(state, roms):
+    src = make_zip(roms / "psx.zip", {
+        "Good (USA).zip": zip_bytes({"Good (USA).cue": CUE2.replace(b"Game", b"Good"),
+                                     "Good (USA) (Track 1).bin": b"\0", "Good (USA) (Track 2).bin": b"\1",
+                                     "readme.txt": b"x"}),
+        "Clone (USA).zip": zip_bytes({"Clone (USA).ccd": b"x", "Clone (USA).img": b"\0", "Clone (USA).sub": b"\0"}),
+    })
+    job = submit_opts(state, src, "psx", convert=False)
+    assert sorted(f.name for f in (roms / "psx").iterdir()) == [
+        "Good (USA) (Track 1).bin", "Good (USA) (Track 2).bin", "Good (USA).cue"]
+    items = {i["name"]: i for i in state.queue.items(job["id"])}
+    assert items["Clone (USA).zip"]["status"] == "skipped" and ".ccd" in items["Clone (USA).zip"]["detail"]
+
+
+def test_folder_as_source(state, roms, tmp_path):
+    inbox = tmp_path / "inbox"
+    (inbox / "sub").mkdir(parents=True)
+    (inbox / "sub" / "Tetris (World).gb").write_bytes(ROM)
+    (inbox / "Euro (Europe).gb").write_bytes(ROM)
+    job = submit(state, inbox, "gb")
+    assert job["status"] == "done", job
+    assert [f.name for f in (roms / "gb").iterdir()] == ["Tetris (World).gb"]
+    assert (inbox / "sub" / "Tetris (World).gb").exists()  # originals left in place
 
 
 def test_never_overwrites(state, roms):

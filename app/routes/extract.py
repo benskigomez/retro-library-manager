@@ -101,15 +101,17 @@ def plan_csv(request: Request, path: str, system: str):
 
 
 @router.post("/extract/run")
-def run(request: Request, path: str = Form(...), system: str = Form(...), import_mode: str = Form("none")):
+def run(request: Request, path: str = Form(...), system: str = Form(...), import_mode: str = Form("none"),
+        disc_mode: str = Form("")):
     s = st(request)
     p = _checked_archive(s, path)
-    s.system(system)
+    sysdef = s.system(system)
     if import_mode not in ("none", "copy", "move"):
         raise HTTPException(400, "bad import mode")
+    convert = (disc_mode == "chd") if (sysdef.disc and disc_mode in ("chd", "original")) else None
     title = f"Extract {p.name} → {system}" + (f" ({import_mode} into _source)" if import_mode != "none" else "")
-    job_id = s.queue.submit("extract", title, {"archive": str(p), "system": system, "import_mode": import_mode},
-                            system=system)
+    job_id = s.queue.submit("extract", title, {"archive": str(p), "system": system, "import_mode": import_mode,
+                                               "convert": convert}, system=system)
     return redirect(request, f"/jobs/{job_id}")
 
 

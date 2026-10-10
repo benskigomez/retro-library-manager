@@ -18,11 +18,17 @@ class System(BaseModel):
     disc: Literal["cd", "dvd"] | None = None
     arcade: bool = False
     hooks: list[str] = Field(default_factory=list)
+    # Disc systems: "chd" (default) converts disc games when adding them; "original" copies the files.
+    prefer: Literal["chd", "original"] | None = None
 
     @field_validator("extensions")
     @classmethod
     def _norm(cls, v: list[str]) -> list[str]:
         return [e.lower() if e.startswith(".") else "." + e.lower() for e in v]
+
+    @property
+    def prefers_chd(self) -> bool:
+        return bool(self.disc) and self.prefer != "original"
 
     @property
     def rom_extensions(self) -> set[str]:

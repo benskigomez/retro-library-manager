@@ -10,13 +10,14 @@ from __future__ import annotations
 import csv
 import io
 import os
+import posixpath
 import shutil
 import tempfile
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import archives, fsutil
+from . import archives, chd, fsutil
 from .config import Config
 from .filters import BIOS, EXCLUDE, INCLUDE, Decision, RuleSet
 from .hooks import HOOKS
@@ -26,8 +27,10 @@ from .systems import ARCHIVE_EXTS, System
 PRESENT = "present"
 SKIPPED = "skipped"
 
+PART = "part"  # a track file planned together with its .cue/.gdi
+
 # Entry kinds
-ROM, INNER, SET, OTHER = "rom", "inner", "set", "other"
+ROM, INNER, SET, OTHER, DISC, TRACK = "rom", "inner", "set", "other", "disc", "track"
 
 
 @dataclass
@@ -38,6 +41,7 @@ class Row:
     decision: str
     rule: str
     target: str = ""
+    members: list[str] = field(default_factory=list)  # DISC rows: the track entries that go with it
 
 
 @dataclass
@@ -75,17 +79,71 @@ def existing_names(folder: Path) -> set[str]:
     return {e.name.casefold() for e in os.scandir(folder) if e.is_file()}
 
 
+def _parent(name: str) -> str:
+    return name.rsplit("/", 1)[0] if "/" in name else ""
+
+
+def disc_groups(source: Path, entries: list[archives.Entry]) -> tuple[dict, dict, set]:
+    """Group .cue/.gdi sheets with the track files they reference.
+
+    Returns (groups, owner, odd_layouts):
+      groups[descriptor] = (member entry names, missing reference names)
+      owner[track entry] = descriptor entry name
+      odd_layouts = {(folder, stem)} of CloneCD/MDS/NRG sets, which chdman cannot read
+    """
+    files = [e for e in entries if not e.is_dir]
+    by_path = {e.name.casefold(): e.name for e in files}
+    by_dir_base = {(_parent(e.name).casefold(), e.base.casefold()): e.name for e in files}
+    groups: dict[str, tuple[list[str], list[str]]] = {}
+    owner: dict[str, str] = {}
+    odd = {(_parent(e.name).casefold(), e.stem.casefold()) for e in files if e.ext in (".ccd", ".mds", ".nrg")}
+    for e in files:
+        if e.ext not in (".cue", ".gdi"):
+            continue
+        try:
+            text = archives.read_member(source, e.name, 1024 * 1024).decode("utf-8", "replace")
+        except Exception:  # noqa: BLE001 - unreadable sheet: treat every reference as missing
+            text = ""
+        d = _parent(e.name)
+        members, missing = [], []
+        for ref in chd.descriptor_refs(text, e.ext):
+            ref = ref.replace("\\", "/")
+            joined = posixpath.normpath(f"{d}/{ref}" if d else ref)
+            hit = by_path.get(joined.casefold()) or by_dir_base.get((d.casefold(), ref.rsplit("/", 1)[-1].casefold()))
+            if hit and hit not in members:
+                members.append(hit)
+                owner.setdefault(hit, e.name)
+            elif not hit:
+                missing.append(ref)
+        if not text:
+            missing = ["(could not read the sheet)"]
+        groups[e.name] = (members, missing)
+    return groups, owner, odd
+
+
 def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entry] | None = None,
-         select: set[str] | None = None) -> Plan:
-    """Decide every entry. With ``select``, only those entries are planned and the
-    operator's choice overrides the region/quality filter (never "present" or BIOS)."""
+         select: set[str] | None = None, override: bool = True) -> Plan:
+    """Decide every entry without writing anything.
+
+    ``select`` limits the plan to those entries. With ``override`` (the default)
+    the operator's choice also overrides the region/quality filter; never
+    "present" (no overwrites) or BIOS staging. For disc systems a .cue/.gdi and
+    its tracks are planned as one unit: selecting either brings the whole set.
+    """
     archive = Path(archive)
     entries = entries if entries is not None else archives.list_entries(archive)
+    disc_mode = bool(sysdef.disc) and not sysdef.arcade
+    groups, owner, odd = disc_groups(archive, entries) if disc_mode else ({}, {}, set())
     if select is not None:
+        select = set(select)
+        for desc, (members, _missing) in groups.items():
+            if desc in select or any(m in select for m in members):
+                select.add(desc)
+                select.update(members)
         entries = [e for e in entries if e.name in select]
 
     def manual(d: Decision) -> Decision:
-        if select is not None and d.category == EXCLUDE:
+        if select is not None and override and d.category == EXCLUDE:
             return Decision(INCLUDE, f"selected manually (filter: {d.rule})")
         return d
 
@@ -141,15 +199,29 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
                 p.rows.append(Row(e.name, base, SET, INCLUDE, d.rule, base))
             continue
 
+        if disc_mode:
+            if e.name in owner:
+                continue  # planned together with its .cue/.gdi
+            if (_parent(e.name).casefold(), stem.casefold()) in odd:
+                p.rows.append(Row(e.name, base, OTHER, SKIPPED,
+                                  "CloneCD/MDS/NRG layout: chdman needs .cue/.bin, convert it first"))
+                continue
+            if e.name in groups:
+                p.rows.extend(_plan_disc_set(e, groups[e.name], manual(rules.decide(e.name)), stems, names, seen))
+                continue
+
         kind = INNER if ext in ARCHIVE_EXTS else ROM
         if kind == ROM and accepted and ext not in accepted:
             p.rows.append(Row(e.name, base, OTHER, SKIPPED, f"extension {ext or '(none)'} not accepted by {sysdef.key}"))
             continue
+        if disc_mode and ext == ".iso":
+            kind = DISC  # a single-file disc image: convertible to CHD
         d = manual(rules.decide(e.name))
         key = stem.casefold()
         # Inside one archive, "Game.cue" and "Game.bin" are distinct files; only
         # identical base names are duplicates. Against the folder, the stem decides.
         dup_key = key if kind == INNER else base.casefold()
+        target = base if kind == ROM else (f"{stem}.chd / {base}" if kind == DISC else f"{stem}.*")
         if d.category == BIOS:  # custom bios prefix handled above; keep for completeness
             p.rows.append(Row(e.name, base, kind, BIOS, d.rule, f"_bios/{sysdef.key}/{base}"))
         elif d.category != INCLUDE:
@@ -160,8 +232,36 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
             p.rows.append(Row(e.name, base, kind, SKIPPED, "duplicate name in archive"))
         else:
             seen.add(dup_key)
-            p.rows.append(Row(e.name, base, kind, INCLUDE, d.rule, base if kind == ROM else f"{stem}.*"))
+            p.rows.append(Row(e.name, base, kind, INCLUDE, d.rule, target))
     return p
+
+
+def _plan_disc_set(e: archives.Entry, group, d: Decision, stems: set[str], names: set[str],
+                   seen: set[str]) -> list[Row]:
+    members, missing = group
+    base, stem = e.base, e.stem
+    n = len(members)
+    tracks = f"{n} track file{'s' if n != 1 else ''}"
+    if d.category != INCLUDE:
+        row = Row(e.name, base, DISC, EXCLUDE, d.rule, members=members)
+    elif not members and not missing:
+        row = Row(e.name, base, DISC, SKIPPED, "the sheet references no track files")
+    elif missing:
+        row = Row(e.name, base, DISC, SKIPPED, f"incomplete set: missing {', '.join(missing[:5])}",
+                  members=members)
+    elif stem.casefold() in stems:
+        row = Row(e.name, base, DISC, PRESENT, f"{stem}.* already exists", members=members)
+    elif any(m.rsplit("/", 1)[-1].casefold() in names for m in members):
+        row = Row(e.name, base, DISC, SKIPPED, "some of its tracks are already in the folder; not mixing sets",
+                  members=members)
+    elif base.casefold() in seen:
+        row = Row(e.name, base, DISC, SKIPPED, "duplicate name in archive", members=members)
+    else:
+        seen.add(base.casefold())
+        row = Row(e.name, base, DISC, INCLUDE, f"{d.rule} · disc set with {tracks}",
+                  f"{stem}.chd / {base} + {tracks}", members=members)
+    parts = [Row(m, m.rsplit("/", 1)[-1], TRACK, PART, f"track of {base} (goes with it)") for m in members]
+    return [row] + parts
 
 
 # ---- execution -----------------------------------------------------------------
@@ -171,11 +271,17 @@ class Extractor:
 
     def __init__(self, archive: Path, tmp_root: Path):
         self.archive = Path(archive)
-        self.is_zip = self.archive.suffix.lower() == ".zip"
+        self.is_dir = self.archive.is_dir()
+        self.is_zip = not self.is_dir and self.archive.suffix.lower() == ".zip"
         self.tmp_root = tmp_root
         self._tree: Path | None = None
 
     def write_member(self, member: str, dest: Path, check=None) -> int:
+        if self.is_dir:
+            src = self.archive / member
+            if not fsutil.is_within(src, self.archive):
+                raise ValueError(f"unsafe path: {member}")
+            return fsutil.copy_new(src, dest, check)
         if self.is_zip:
             return archives.extract_zip_member(self.archive, member, dest, check)
         if self._tree is None:
@@ -194,10 +300,58 @@ class Extractor:
             shutil.rmtree(self._tree, ignore_errors=True)
 
 
+def _copy_files_all_or_nothing(ctx, files: list[tuple[Path, str]], folder: Path, label: str) -> bool:
+    """Copy (source path, name) pairs into ``folder`` as one unit; nothing is left half-copied."""
+    if any((folder / name).exists() for _src, name in files):
+        ctx.count("present")
+        ctx.item(label, "present", "already in the folder (whole set or part of it); not overwritten")
+        return False
+    written: list[Path] = []
+    try:
+        for src, name in files:
+            fsutil.copy_new(src, folder / name, ctx.check)
+            written.append(folder / name)
+    except BaseException:
+        for w in written:
+            w.unlink(missing_ok=True)
+        raise
+    return True
+
+
+def _unpack_inner_disc(ctx, sysdef: System, work: Path, folder: Path, row: Row) -> None:
+    """A per-game disc archive: copy each .cue/.gdi with all of its tracks, or nothing."""
+    names = [str(Path(r) / f) for r, _d, fs in os.walk(work) for f in fs]
+    descs, problem = chd.pick_descriptors(names)
+    if problem:
+        ctx.count("skipped")
+        ctx.item(row.base, "skipped", problem)
+        ctx.log(f"SKIP {row.base}: {problem}")
+        return
+    for desc in map(Path, descs):
+        tracks, missing = chd.resolve_tracks(desc)
+        if missing:
+            ctx.count("failed")
+            ctx.item(desc.name, "failed", f"from {row.base}: missing track(s) {', '.join(missing)}; nothing copied")
+            continue
+        if any(t.parent != desc.parent for t in tracks):
+            ctx.count("failed")
+            ctx.item(desc.name, "failed", f"from {row.base}: tracks are in sub-folders; convert to CHD instead")
+            continue
+        files = [(desc, desc.name)] + [(t, t.name) for t in tracks]
+        if _copy_files_all_or_nothing(ctx, files, folder, desc.name):
+            existing_stems_cache(ctx, folder).add(desc.stem.casefold())
+            ctx.count("added")
+            ctx.item(desc.name, "added", f"from {row.base} with {len(tracks)} track file(s)")
+            ctx.log(f"ADD  {desc.name} + {len(tracks)} track(s)  (from {row.base})")
+
+
 def _unpack_inner(ctx, cfg: Config, sysdef: System, inner_archive: Path, folder: Path, row: Row) -> None:
     """Unpack one per-game inner archive's ROM files flat into the system folder."""
     work = inner_archive.parent / "x"
     archives.extract_all(inner_archive, work)
+    if sysdef.disc and any(Path(f).suffix.lower() in chd.DISC_EXTS for _r, _d, fs in os.walk(work) for f in fs):
+        _unpack_inner_disc(ctx, sysdef, work, folder, row)
+        return
     ignore = {e.lower() for e in cfg.ignore_extensions}
     accepted = sysdef.rom_extensions - set(ARCHIVE_EXTS)
     roms = []
@@ -254,6 +408,50 @@ def _stage_inner_bios(ctx, cfg: Config, sysdef: System, inner_archive: Path, bio
         ctx.item(row.base, "skipped", "archive contains no files")
 
 
+def _add_disc_set(ctx, cfg: Config, sysdef: System, ex: "Extractor", row: Row, folder: Path,
+                  tmp_root: Path, convert: bool) -> None:
+    """A .cue/.gdi (with its tracks) or a single .iso from the outer archive."""
+    desc_dir = _parent(row.entry)
+    rels = [(m, posixpath.relpath(m, desc_dir) if desc_dir else m) for m in [row.entry] + row.members]
+    if convert:
+        work = Path(tempfile.mkdtemp(prefix="disc-", dir=tmp_root))
+        try:
+            for member, rel in rels:
+                dest = work / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                ex.write_member(member, dest, ctx.check)
+            stem = Path(row.base).stem
+            game = chd.Game(stem, "loose", work / rels[0][1], targets=[stem])
+            chd.convert_game(ctx, cfg, sysdef, game, backup=False)  # the source is the backup
+            existing_stems_cache(ctx, folder).add(stem.casefold())
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        return
+    if any("/" in rel or rel.startswith("..") for _m, rel in rels[1:]):
+        ctx.count("failed")
+        ctx.item(row.base, "failed", "tracks are in sub-folders; flat copy would break the sheet; convert to CHD instead")
+        return
+    if any((folder / posixpath.basename(m)).exists() for m, _rel in rels):
+        ctx.count("present")
+        ctx.item(row.base, "present", "already in the folder (whole set or part of it); not overwritten")
+        return
+    written: list[Path] = []
+    try:
+        for member, _rel in rels:
+            dest = folder / posixpath.basename(member)
+            ex.write_member(member, dest, ctx.check)
+            written.append(dest)
+    except BaseException:
+        for w in written:
+            w.unlink(missing_ok=True)
+        raise
+    existing_stems_cache(ctx, folder).add(Path(row.base).stem.casefold())
+    ctx.count("added")
+    extra = f" with {len(row.members)} track file(s)" if row.members else ""
+    ctx.item(row.base, "added", row.rule + extra)
+    ctx.log(f"ADD  {row.base}{extra}")
+
+
 def existing_stems_cache(ctx, folder: Path) -> set[str]:
     cache = getattr(ctx, "_stems", None)
     if cache is None:
@@ -263,14 +461,19 @@ def existing_stems_cache(ctx, folder: Path) -> set[str]:
 
 
 def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] | None = None,
-            convert: bool = False) -> dict:
-    """Extract the plan. ``convert``: per-game inner archives of disc systems become CHDs."""
+            convert: bool | None = None, override: bool = True) -> dict:
+    """Extract the plan. ``convert``: disc games become CHDs (default: the system's ``prefer``)."""
+    if convert is None:
+        convert = sysdef.prefers_chd
+    convert = convert and bool(sysdef.disc)
     archive = Path(archive)
     ready = fsutil.wait_stable(archive, cfg.stability.wait_seconds)
     if not ready.ok:
         raise RuntimeError(f"{archive.name} is not ready: {ready.reason}")
-    ctx.log(f"Archive {archive} is stable; planning against {cfg.system_dir(sysdef.key)}")
-    p = plan(cfg, sysdef, archive, select=set(select) if select else None)
+    ctx.log(f"{archive} is stable; planning against {cfg.system_dir(sysdef.key)}")
+    if sysdef.disc:
+        ctx.log("Disc games: " + ("convert to CHD" if convert else "copy original files"))
+    p = plan(cfg, sysdef, archive, select=set(select) if select else None, override=override)
     totals = p.totals
     ctx.log("Plan: " + ", ".join(f"{k} {v}" for k, v in sorted(totals.items())))
     ctx.count("matched", totals.get(INCLUDE, 0))
@@ -303,6 +506,8 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
                         ctx.count("bios_staged")
                         ctx.item(r.base, "bios", f"staged to _bios/{sysdef.key}/")
                         ctx.log(f"BIOS {r.base} -> _bios/{sysdef.key}/")
+                elif r.kind == DISC:
+                    _add_disc_set(ctx, cfg, sysdef, ex, r, folder, tmp_root, convert)
                 elif r.kind in (ROM, SET):
                     ex.write_member(r.entry, folder / r.base, ctx.check)
                     existing_stems_cache(ctx, folder).add(Path(r.base).stem.casefold())
@@ -316,9 +521,7 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
                         continue
                     inner = ex.member_to_temp(r.entry, ctx.check)
                     try:
-                        if convert and sysdef.disc:
-                            from . import chd
-
+                        if convert:
                             game = chd.Game(Path(r.base).stem, "archive", inner)
                             chd.convert_game(ctx, cfg, sysdef, game, backup=False)  # the source zip is the backup
                         else:
@@ -401,7 +604,8 @@ def run_job(state, ctx) -> dict:
         if not ready.ok:
             raise RuntimeError(f"{archive.name} is not ready: {ready.reason}")
         archive = import_archive(ctx, cfg, sysdef.key, archive, prm["import_mode"])
-    result = execute(ctx, cfg, sysdef, archive, select=prm.get("select"), convert=bool(prm.get("convert")))
+    result = execute(ctx, cfg, sysdef, archive, select=prm.get("select"), convert=prm.get("convert"),
+                     override=prm.get("override", True))
     state.library.invalidate()
     return result
 

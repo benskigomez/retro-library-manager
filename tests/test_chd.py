@@ -113,6 +113,31 @@ def test_multi_disc_archive_makes_one_chd_per_cue(chd_state, roms):
     assert {p.name for p in (roms / "psx").iterdir()} == {"Epic (USA) (Disc 1).chd", "Epic (USA) (Disc 2).chd"}
 
 
+def test_disc_systems_convert_by_default_when_adding(chd_state, roms):
+    src = make_zip(roms / "_source" / "pcenginecd-roms.zip", {
+        "PCECD/Game D (USA).cue": cue("Game D (USA) (Track 1).bin", "Game D (USA) (Track 2).bin"),
+        "PCECD/Game D (USA) (Track 1).bin": b"\0" * 2352, "PCECD/Game D (USA) (Track 2).bin": b"\0" * 2352,
+    })
+    job = run_job(chd_state, chd_state.queue.submit("extract", "t", {
+        "archive": str(src), "system": "pcenginecd", "import_mode": "none"}))
+    assert job["status"] == "done", job
+    assert [p.name for p in (roms / "pcenginecd").iterdir()] == ["Game D (USA).chd"]
+    assert job["summary"]["converted"] == 1
+
+
+def test_prefer_original_copies_files(chd_state, roms):
+    text = chd_state.settings.systems_path.read_text()
+    text = text.replace("    extensions: [.chd, .cue, .bin, .m3u]\n    disc: cd\n  neogeo",
+                        "    extensions: [.chd, .cue, .bin, .m3u]\n    disc: cd\n    prefer: original\n  neogeo")
+    chd_state.settings.save_text(chd_state.settings.systems_path, text, lambda t: None)
+    chd_state.reload()
+    assert not chd_state.system("pcenginecd").prefers_chd
+    src = make_zip(roms / "x.zip", {"Game E (USA).cue": cue("e.bin"), "e.bin": b"\0" * 2352})
+    run_job(chd_state, chd_state.queue.submit("extract", "t", {"archive": str(src), "system": "pcenginecd",
+                                                               "import_mode": "none"}))
+    assert sorted(p.name for p in (roms / "pcenginecd").iterdir()) == ["Game E (USA).cue", "e.bin"]
+
+
 def test_gdi_tracks_parsed(tmp_path):
     gdi = tmp_path / "disc.gdi"
     gdi.write_text('3\n1 0 4 2352 "track 01.bin" 0\n2 600 0 2352 track02.raw 0\n3 45000 4 2352 track03.bin 0\n')

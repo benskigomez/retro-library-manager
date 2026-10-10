@@ -289,6 +289,25 @@ def wait_stable(path: Path, wait_seconds: float, sleep: Callable[[float], None] 
     then require the container's index (zip central directory / 7z header) to parse.
     """
     path = Path(path)
+    if path.is_dir():
+        def snapshot():
+            out = []
+            for root, _d, files in os.walk(path):
+                for f in files:
+                    try:
+                        st = os.stat(os.path.join(root, f))
+                    except FileNotFoundError:
+                        continue
+                    out.append((root, f, st.st_size, st.st_mtime_ns))
+            return sorted(out)
+
+        first = snapshot()
+        sleep(wait_seconds)
+        if snapshot() != first:
+            return Readiness(False, "files in the folder are still changing; try again when the copy finishes")
+        if not first:
+            return Readiness(False, "folder is empty")
+        return Readiness(True)
     try:
         a = path.stat()
         sleep(wait_seconds)

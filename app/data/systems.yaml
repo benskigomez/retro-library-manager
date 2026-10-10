@@ -8,6 +8,8 @@
 #   disc:        null, "cd" (chdman createcd) or "dvd" (chdman createdvd)
 #   arcade:      true = archives are game sets; never unpacked, copied as-is
 #   hooks:       post-processing hooks run after extraction (e.g. lynx)
+#   prefer:      disc systems only: chd (default) converts disc games to CHD when
+#                they are added; original copies .cue/.bin/.iso files as they are
 
 systems:
   gb:
