@@ -5,10 +5,11 @@ from .state import State
 
 
 def register_handlers(state: State) -> None:
-    from . import extract
+    from . import chd, extract
 
     q = state.queue
     q.register("extract")(lambda ctx: extract.run_job(state, ctx))
+    q.register("chd")(lambda ctx: chd.run_job(state, ctx))
     q.register("lynx_regen")(lambda ctx: extract_lynx_regen(state, ctx))
 
 

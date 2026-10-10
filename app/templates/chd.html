@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Disc → CHD</h1>
+{% if not chdman_found %}<div class="flash error"><code>{{ state.cfg.tools.chdman }}</code> was not found in this container. CHD jobs will fail until it is installed (the Docker image ships it via <code>mame-tools</code>).</div>{% endif %}
+<p class="muted small">Input: a folder of per-game archives (.zip/.7z), sub-folders with disc sets, or loose .cue/.gdi/.iso files — or a single archive.
+  Each game is extracted to <code>{{ state.cfg.paths.temp }}</code> (map it to fast storage), converted with <code>chdman createcd</code>
+  (<code>createdvd</code> for .iso on DVD/UMD systems) and written to <code>/roms/&lt;system&gt;/&lt;game&gt;.chd</code>.
+  On success the original archive is moved to <code>_source/&lt;system&gt;/</code>; on failure temp files are kept.</p>
+<div class="panel">
+  <form class="stack" style="max-width:none" hx-post="/chd/plan" hx-target="#chd-plan" hx-indicator="#chd-spin">
+    <div class="row">
+      <div><label for="chd-path">Input folder or archive</label>
+        <input type="text" id="chd-path" name="path" value="{{ path }}" required placeholder="{{ state.cfg.paths.roms }}/_incoming/pcenginecd"></div>
+      <div class="shrink"><button type="button" class="secondary"
+        hx-get="/files/browse?path={{ state.cfg.paths.roms | urlencode }}&target=chd-path&pick=dir" hx-target="#chd-picker">Browse…</button></div>
+      <div class="shrink"><label>System</label>
+        <select name="system">{% for key, sd in systems.items() %}<option value="{{ key }}" {{ 'selected' if key == system }}>{{ key }} ({{ sd.disc }})</option>{% endfor %}</select></div>
+    </div>
+    <div id="chd-picker"></div>
+    <div><button type="submit">Dry run</button> <span id="chd-spin" class="htmx-indicator muted small">reading…</span></div>
+  </form>
+</div>
+<div id="chd-plan"></div>
+{% endblock %}

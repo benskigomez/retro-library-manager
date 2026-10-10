@@ -1,0 +1,24 @@
+<div class="panel">
+  <h2 style="margin-top:0">Dry run — {{ sysdef.key }}</h2>
+  <div class="totals">
+    <span class="badge ok">convert {{ totals.get('convert', 0) }}</span>
+    <span class="badge warn">present {{ totals.get('present', 0) }}</span>
+    <span class="badge bad">unsupported {{ totals.get('unsupported', 0) }}</span>
+    {% if totals.get('empty') %}<span class="badge bad">no descriptor {{ totals.get('empty') }}</span>{% endif %}
+  </div>
+  <form method="post" action="/chd/run">
+    <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ sysdef.key }}">
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Game</th><th>Source</th><th>Output</th><th>Status</th></tr></thead>
+      <tbody>{% for g in games %}
+        <tr><td>{% if g.status == 'convert' %}<input type="checkbox" name="only" value="{{ g.name }}" checked>{% endif %}</td>
+          <td>{{ g.name }}</td><td class="small">{{ g.kind }}{% if g.size %} · {{ g.size | size }}{% endif %}</td>
+          <td class="small">{% for t in g.targets %}{{ t }}.chd<br>{% endfor %}</td>
+          <td><span class="badge s-{{ 'include' if g.status == 'convert' else g.status }}">{{ g.status }}</span>
+            {% if g.detail %}<div class="small muted">{{ g.detail }}</div>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="5" class="muted">No games found.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if totals.get('convert') %}<p><button type="submit">Convert selected</button>
+      <span class="small muted">existing .chd files are never overwritten</span></p>{% endif %}
+  </form>
+</div>
