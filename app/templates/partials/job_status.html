@@ -8,6 +8,10 @@
     <dt>Ended</dt><dd>{{ job.ended_at or '—' }}</dd>
     {% if job.error %}<dt>Error</dt><dd style="color:var(--bad)">{{ job.error }}</dd>{% endif %}
   </dl>
+  {% if job.kind == 'download_convert' and job.status == 'done' %}
+  <p><button type="button" onclick="rlmDownload('/download/prepared/{{ job.id }}', {{ (job.params.name.rsplit('.', 1)[0] ~ ('.iso' if job.params.format == 'iso' else '.zip')) | tojson | forceescape }}, this)">Download {{ job.params.format | upper }}</button>
+    <span class="small muted">available for 24 hours</span></p>
+  {% endif %}
   {% if job.summary %}
   <div class="totals">{% for k, v in job.summary.items() %}{% if v is number %}<span class="badge s-{{ k }}">{{ k }}: {{ v }}</span>{% endif %}{% endfor %}</div>
   {% for k, v in job.summary.items() if v is not number %}<div class="small"><b>{{ k }}:</b> {{ v }}</div>{% endfor %}

@@ -44,12 +44,14 @@
   <div class="row"><div class="shrink"><button class="secondary" type="submit">Preview move selected to trash</button></div></div>
   <div id="trash-preview"></div>
   <div class="table-wrap"><table>
-    <thead><tr><th></th><th>Name</th><th class="num">Size</th><th>Kind</th></tr></thead>
+    <thead><tr><th></th><th>Name</th><th class="num">Size</th><th>Kind</th><th>Download</th></tr></thead>
     <tbody>
     {% for f in files[:3000] %}
       <tr><td><input type="checkbox" name="names" value="{{ f.name }}"></td><td>{{ f.name }}</td>
-        <td class="num">{{ f.size | size }}</td><td><span class="badge {{ 'ok' if f.kind == 'game' else 'warn' }}">{{ f.kind }}</span></td></tr>
-    {% else %}<tr><td colspan="4" class="muted">No files.</td></tr>{% endfor %}
+        <td class="num">{{ f.size | size }}</td><td><span class="badge {{ 'ok' if f.kind in ('game', 'meta') else 'warn' }}">{{ f.kind }}</span></td>
+        <td class="small">{% if f.kind != 'meta' %}<a href="#" onclick="rlmDownload({{ ('/download/' ~ sysdef.key ~ '/' ~ (f.name | urlencode)) | tojson | forceescape }}, {{ f.dl_name | tojson | forceescape }}, this);return false">⬇ {{ 'zip' if f.dl_name != f.name else 'file' }}</a>
+          {% if f.is_chd and sysdef.disc %}· <a href="#" hx-post="/download/{{ sysdef.key }}/{{ f.name | urlencode }}/convert" hx-vals='{"format": "{{ 'iso' if sysdef.disc == 'dvd' else 'cue' }}"}'>as {{ 'ISO' if sysdef.disc == 'dvd' else 'BIN/CUE' }}…</a>{% endif %}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No files.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% if files | length > 3000 %}<p class="muted small">Showing the first 3000 of {{ files | length }} files.</p>{% endif %}

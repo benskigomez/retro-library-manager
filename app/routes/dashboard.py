@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
 
-from .. import fsutil
+from .. import download, fsutil
 from ..library import _is_meta, scan_system
 from . import redirect, render, st
 
@@ -42,7 +42,9 @@ def system_page(request: Request, key: str, show: str = "all"):
                 kind = "game" if ext in accepted else ("archive" if ext in (".zip", ".7z") else "other")
             if show == "flagged" and kind in ("game", "meta"):
                 continue
-            files.append({"name": e.name, "size": e.stat().st_size, "kind": kind})
+            multi = ext in (".cue", ".gdi", ".m3u") and len(download.game_files(Path(e.path))) > 1
+            files.append({"name": e.name, "size": e.stat().st_size, "kind": kind,
+                          "dl_name": (Path(e.name).stem + ".zip") if multi else e.name, "is_chd": ext == ".chd"})
     jobs = s.queue.recent(20, system=key)
     filters = s.cfg.filters.systems.get(key)
     return render(request, "system.html", sysdef=sysdef, status=status, files=files, jobs=jobs,

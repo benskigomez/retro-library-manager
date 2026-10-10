@@ -50,6 +50,9 @@ def create_app(settings: Settings | None = None, start_workers: bool = True) -> 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        from .download import cleanup_prepared
+
+        cleanup_prepared(state.cfg)
         if start_workers:
             state.queue.start()
         yield
@@ -61,10 +64,10 @@ def create_app(settings: Settings | None = None, start_workers: bool = True) -> 
     app.state.templates = make_templates()
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
-    from .routes import arcade, bios, chd, dashboard, extract, files, jobs, settings_page, trash
+    from .routes import arcade, bios, chd, dashboard, download, extract, files, jobs, settings_page, trash
 
     deps = [Depends(require_auth)]
-    for module in (dashboard, jobs, settings_page, trash, files, extract, chd, bios, arcade):
+    for module in (dashboard, jobs, settings_page, trash, files, extract, chd, bios, arcade, download):
         app.include_router(module.router, dependencies=deps)
 
     @app.get("/healthz", include_in_schema=False)

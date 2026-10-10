@@ -5,7 +5,7 @@ from .state import State
 
 
 def register_handlers(state: State) -> None:
-    from . import bios, chd, extract
+    from . import bios, chd, download, extract
 
     q = state.queue
     q.register("extract")(lambda ctx: extract.run_job(state, ctx))
@@ -19,6 +19,7 @@ def register_handlers(state: State) -> None:
     q.register("mame_verify")(lambda ctx: arcade.run_verify(state, ctx))
     q.register("mame_hide")(lambda ctx: arcade.run_hide(state, ctx))
     q.register("mame_bundle")(lambda ctx: arcade.run_bundle(state, ctx))
+    q.register("download_convert")(lambda ctx: download.run_convert(state, ctx))
     q.register("lynx_regen")(lambda ctx: extract_lynx_regen(state, ctx))
 
 

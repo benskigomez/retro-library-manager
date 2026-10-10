@@ -16,6 +16,14 @@ if "FAIL" in inp.name:
 if out.exists():
     print("Error: file already exists", file=sys.stderr)
     sys.exit(1)
+if mode == "extractcd":
+    ob = Path(args[args.index("-ob") + 1])
+    ob.write_bytes(b"\0" * 2352 * 2)
+    out.write_text(f'FILE "{ob.name}" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n')
+    sys.exit(0)
+if mode == "extractdvd":
+    out.write_bytes(b"ISO" + inp.read_bytes())
+    sys.exit(0)
 for pct in (10, 50, 100):
     print(f"Compressing, {pct}.0% complete... (ratio=50.0%)", end="\r", flush=True)
 print("\nCompression complete ... final ratio = 50.0%")

@@ -91,6 +91,18 @@ Disc systems: put per-game archives in a folder, then go to **Disc → CHD** →
 
 ---
 
+## Downloading a game to this device
+
+Each file on a system page has a **⬇** link:
+
+- Single-file games download as-is.
+- Multi-file games (a `.cue` with its tracks, `.gdi`, `.m3u` with all its discs) download as one zip, built on the fly with no temp copy.
+- `.chd` files on disc systems also offer **as BIN/CUE…** (CD) or **as ISO…** (DVD/UMD). This runs `chdman extractcd`/`extractdvd` as a job into the scratch folder, and the job page then shows a **Download** button. Prepared files are deleted after 24 hours. The library itself is never modified.
+
+**Choosing the save location:** Chromium browsers (Chrome, Edge) open a "Save as" dialog only on HTTPS or localhost. That covers using the app through an HTTPS reverse proxy, or over Tailscale with `tailscale serve`. On plain `http://jarvis:8787` the browser does a normal download, which asks for a location if *Settings → Downloads → Ask where to save each file* is on.
+
+---
+
 ## BIOS install modes
 
 The desktop is not always on, so the app never depends on reaching it.
