@@ -74,6 +74,11 @@ class FiltersCfg(BaseModel):
         return v
 
 
+class BiosCfg(BaseModel):
+    share_unc: str = r"\\jarvis\roms"
+    desktop_path: str = r"G:\RetroBat\bios"
+
+
 class LynxCfg(BaseModel):
     manufacturer: str = ""
     rotation: dict[str, Literal["left", "right", "none"]] = Field(default_factory=dict)
@@ -88,6 +93,7 @@ class Config(BaseModel):
     tools: ToolsCfg = Field(default_factory=ToolsCfg)
     ignore_extensions: list[str] = Field(default_factory=lambda: [".txt", ".nfo"])
     filters: FiltersCfg = Field(default_factory=FiltersCfg)
+    bios: BiosCfg = Field(default_factory=BiosCfg)
     lynx: LynxCfg = Field(default_factory=LynxCfg)
 
     # ---- derived paths -------------------------------------------------

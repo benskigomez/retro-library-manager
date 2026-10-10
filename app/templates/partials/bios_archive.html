@@ -1,0 +1,14 @@
+{% set hits = members | selectattr('matches') | list %}
+<div class="totals" style="margin-top:.6rem"><span class="badge">{{ members | length }} files</span>
+  <span class="badge ok">{{ hits | length }} match the catalog</span></div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Member</th><th class="hide-sm">MD5</th><th>Satisfies</th></tr></thead>
+  <tbody>{% for m in members %}
+    <tr><td class="small">{{ m.name }}</td><td class="mono small hide-sm">{{ m.md5 }}</td>
+      <td class="small">{% for x in m.matches %}<span class="badge {{ 'ok' if x.satisfies else 'warn' }}">{{ x.entry.system }}/{{ x.entry.file }}{{ ' (different MD5)' if x.how == 'name-mismatch' }}</span> {% endfor %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% if hits | selectattr('matches') | list %}
+<form method="post" action="/bios/stage" style="margin-top:.6rem"><input type="hidden" name="path" value="{{ path }}">
+  <button>Stage matching files into _bios/&lt;system&gt;/</button> <span class="small muted">original names kept; existing files never overwritten</span></form>
+{% endif %}

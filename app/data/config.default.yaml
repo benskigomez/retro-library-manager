@@ -48,6 +48,10 @@ filters:
   #    allow: ["Terranigma (Europe)"]
   #    deny: ["re:^Super Mario World \\(USA\\) \\(Beta"]
 
+bios:
+  share_unc: '\\jarvis\roms'        # how the desktop reaches this share (used in the generated PowerShell)
+  desktop_path: 'G:\RetroBat\bios'  # RetroBat BIOS folder on the desktop
+
 lynx:
   manufacturer: ""             # 16-byte manufacturer field written into generated LNX headers
   rotation: {}                 # per-game override, keyed by title prefix: left | right

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>BIOS manager</h1>
+<p class="muted small">{{ catalog_count }} catalog entries (<a href="/settings?which=bios_catalog">edit</a>). Staged files live in
+  <code>_bios/&lt;system&gt;/</code> under their original names. Install target: RetroBat's <code>{{ state.cfg.bios.desktop_path }}</code>
+  — {% if root %}<span class="badge ok">mounted at {{ root }}</span>{% else %}<span class="badge warn">not mounted; export mode</span>{% endif %}</p>
+
+<h2>Status by system</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>System</th><th>Required</th><th>Optional</th><th>Missing required</th></tr></thead>
+  <tbody>{% for d in summary %}
+    <tr><td>{{ d.system }}</td>
+      <td>{% if d.req_total %}
+        <span class="badge {{ 'ok' if d.req_staged == d.req_total else 'bad' }}">staged {{ d.req_staged }}/{{ d.req_total }}</span>
+        {% if root %}<span class="badge {{ 'ok' if d.req_installed == d.req_total else 'bad' }}">installed {{ d.req_installed }}/{{ d.req_total }}</span>{% endif %}
+        {% else %}<span class="muted">none</span>{% endif %}</td>
+      <td>{% if d.opt_total %}<span class="badge">staged {{ d.opt_staged }}/{{ d.opt_total }}</span>
+        {% if root %}<span class="badge">installed {{ d.opt_installed }}/{{ d.opt_total }}</span>{% endif %}{% else %}<span class="muted">none</span>{% endif %}</td>
+      <td class="small">{{ d.missing_required | join(', ') }}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<h2>Catalog</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>System</th><th>File</th><th class="hide-sm">MD5</th><th>Req.</th><th>Staged source</th><th>Installed</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td>{{ r.entry.system }}</td><td>{{ r.entry.file }}{% if r.entry.note %}<div class="small muted">{{ r.entry.note }}</div>{% endif %}</td>
+      <td class="mono small hide-sm">{{ r.entry.md5 or '(any)' }}</td>
+      <td>{{ 'yes' if r.entry.required else '' }}</td>
+      <td class="small">{% if r.source %}<span class="badge ok">✓</span> {{ r.source.rel }}{% if r.sources | length > 1 %} <span class="muted">(+{{ r.sources | length - 1 }})</span>{% endif %}
+        {% else %}<span class="badge {{ 'bad' if r.entry.required else '' }}">missing</span>{% endif %}</td>
+      <td><span class="badge s-{{ {'ok': 'installed', 'mismatch': 'failed', 'missing': 'missing', 'unknown': ''}[r.installed] }}">{{ r.installed }}</span></td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<h2>Install</h2>
+<div class="panel">
+  <div class="row">
+    <div class="shrink"><button {{ 'disabled' if not root }} hx-get="/bios/install/preview?mode=mounted" hx-target="#install-preview">Preview: install to mounted folder</button></div>
+    <div class="shrink"><button class="secondary" hx-get="/bios/install/preview?mode=export" hx-target="#install-preview">Preview: build export bundle</button></div>
+  </div>
+  <p class="small muted">Mounted: share <code>{{ state.cfg.bios.desktop_path }}</code> from the desktop, mount it on Unraid with Unassigned Devices, and map it to the container
+    (set <code>paths.desktop_bios</code>). Files are copied, never overwritten, and verified by MD5.<br>
+    Export: builds <code>_bios/_install/</code> with target names and a PowerShell script to run on the desktop.</p>
+  <div id="install-preview"></div>
+  {% if script %}
+  <details {{ 'open' if not root }}><summary>PowerShell for the desktop (from the last export)</summary>
+    <p class="small muted">Paste into PowerShell on the desktop. It copies only missing files and prints each file's MD5 and OK / MD5-MISMATCH.</p>
+    <pre>{{ script }}</pre></details>
+  {% endif %}
+</div>
+
+<h2>Staged files</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>File</th><th class="num">Size</th><th class="hide-sm">MD5</th><th>Satisfies</th></tr></thead>
+  <tbody>{% for f in staged %}
+    <tr><td class="small">{{ f.rel }}</td><td class="num">{{ f.size | size }}</td><td class="mono small hide-sm">{{ f.md5 }}</td>
+      <td class="small">{% for m in f.matches %}<span class="badge {{ 'ok' if m.satisfies else 'warn' }}" title="{{ m.how }}">{{ m.entry.system }}/{{ m.entry.file }}{{ ' (name only)' if m.how == 'name' }}{{ ' (same name, different MD5)' if m.how == 'name-mismatch' }}</span> {% else %}<span class="muted">no catalog match</span>{% endfor %}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted">Nothing staged in <code>_bios/</code>.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Scan an archive</h2>
+<div class="panel">
+  <form class="stack" style="max-width:none" hx-post="/bios/scan-archive" hx-target="#bios-archive" hx-indicator="#bios-spin">
+    <div class="row">
+      <div><input type="text" id="bios-path" name="path" placeholder="{{ state.cfg.paths.roms }}/_source/bios-pack.zip" required></div>
+      <div class="shrink"><button type="button" class="secondary" hx-get="/files/browse?path={{ (state.cfg.paths.roms ~ '/_source') | urlencode }}&target=bios-path" hx-target="#bios-picker">Browse…</button></div>
+      <div class="shrink"><button type="submit">Scan by MD5</button></div>
+    </div>
+    <div id="bios-picker"></div><span id="bios-spin" class="htmx-indicator muted small">hashing…</span>
+  </form>
+  <div id="bios-archive"></div>
+</div>
+
+<h2>Import a BIOS definition file</h2>
+<div class="panel">
+  <p class="small muted">Paste RetroBat's BIOS definition XML (EmulationStation-style: elements with <code>md5</code> and <code>path</code>/<code>file</code> attributes under a system element)
+    or entries in this app's YAML format. Only new (system, file) pairs are added; existing entries are never changed.</p>
+  <form class="stack" style="max-width:none" hx-post="/bios/catalog/preview" hx-target="#catalog-preview">
+    <textarea name="text" style="min-height:10rem"></textarea>
+    <div><button type="submit" class="secondary">Preview import</button></div>
+  </form>
+  <div id="catalog-preview"></div>
+</div>
+{% endblock %}

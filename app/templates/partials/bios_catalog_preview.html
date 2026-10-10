@@ -1,0 +1,11 @@
+<div class="panel" style="margin-top:.6rem">
+  <div class="totals"><span class="badge">{{ incoming | length }} parsed</span><span class="badge ok">{{ new | length }} new</span>
+    <span class="badge">{{ incoming | length - new | length }} already catalogued</span></div>
+  {% if new %}
+  <table><thead><tr><th>System</th><th>File</th><th>MD5</th><th>Required</th></tr></thead><tbody>
+  {% for e in new[:500] %}<tr><td>{{ e.system }}</td><td>{{ e.file }}</td><td class="mono small">{{ e.md5 }}</td><td>{{ 'yes' if e.required }}</td></tr>{% endfor %}
+  </tbody></table>
+  <form method="post" action="/bios/catalog/import"><textarea name="text" hidden>{{ text }}</textarea>
+    <p><button>Add {{ new | length }} entries to bios_catalog.yaml</button> <span class="small muted">a backup of the current file is kept</span></p></form>
+  {% endif %}
+</div>

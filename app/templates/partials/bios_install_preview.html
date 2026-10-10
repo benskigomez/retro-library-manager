@@ -1,0 +1,21 @@
+{% set todo = rows | selectattr('action', 'equalto', 'install') | list %}
+<div class="panel" style="margin-top:.6rem">
+  <h3 style="margin-top:0">Dry run: {{ 'install to ' ~ root if mode == 'mounted' else 'build _bios/_install/ bundle' }}</h3>
+  <div class="totals">
+    <span class="badge ok">{{ todo | length }} to {{ 'install' if mode == 'mounted' else 'bundle' }}</span>
+    <span class="badge">{{ rows | selectattr('action', 'equalto', 'installed') | list | length }} already {{ 'installed' if mode == 'mounted' else 'bundled' }}</span>
+    <span class="badge bad">{{ rows | selectattr('action', 'equalto', 'conflict') | list | length }} conflict (different file at target, not overwritten)</span>
+    <span class="badge">{{ rows | selectattr('action', 'equalto', 'missing-source') | list | length }} no staged source</span>
+  </div>
+  <form method="post" action="/bios/install">
+    <input type="hidden" name="mode" value="{{ mode }}">
+    <table><thead><tr><th></th><th>Target</th><th>From</th><th>Action</th></tr></thead><tbody>
+    {% for r in rows if r.action != 'missing-source' %}
+      <tr><td>{% if r.action == 'install' %}<input type="checkbox" name="files" value="{{ r.entry.system }}/{{ r.entry.file }}" checked {{ 'disabled' if mode == 'export' }}>{% endif %}</td>
+        <td>{{ r.entry.file }} <span class="muted small">{{ r.entry.system }}</span></td>
+        <td class="small">{{ r.source.rel if r.source else '' }}</td>
+        <td><span class="badge s-{{ {'install': 'include', 'installed': 'installed', 'conflict': 'failed'}[r.action] }}">{{ r.action }}</span></td></tr>
+    {% endfor %}</tbody></table>
+    {% if todo %}<p><button type="submit">{{ 'Install selected' if mode == 'mounted' else 'Build bundle and PowerShell' }}</button></p>{% endif %}
+  </form>
+</div>
