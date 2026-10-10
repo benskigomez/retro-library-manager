@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Lynx headers</h1>
+<p class="muted small">Raw <code>.lyx</code> dumps get a 64-byte LNX header and are written as <code>.lnx</code> next to them (the .lyx stays so re-runs see the game as present).
+  Some carts are played with the Lynx rotated; set an override per title (matched as a case-insensitive prefix of the file name), then regenerate.</p>
+
+<div class="panel">
+  <h2 style="margin-top:0">Rotation overrides</h2>
+  <table><thead><tr><th>Title prefix</th><th>Rotation</th><th></th></tr></thead><tbody>
+  {% for title, rot in overrides.items() %}
+    <tr><td>{{ title }}</td><td>{{ rot }}</td><td>
+      <form method="post" action="/extract/lynx/rotation" style="display:inline"><input type="hidden" name="title" value="{{ title }}">
+        <input type="hidden" name="rotation" value="remove"><button class="secondary" style="padding:.1rem .5rem">remove</button></form></td></tr>
+  {% else %}<tr><td colspan="3" class="muted">No overrides (all headers use rotation "none").</td></tr>{% endfor %}
+  </tbody></table>
+  <form method="post" action="/extract/lynx/rotation" class="row" style="margin-top:.6rem">
+    <div><label>Title prefix</label><input type="text" name="title" placeholder="Gauntlet - The Third Encounter" required></div>
+    <div class="shrink"><label>Rotation</label><select name="rotation"><option>left</option><option>right</option><option>none</option></select></div>
+    <div class="shrink"><button>Save override</button></div>
+  </form>
+</div>
+
+<form hx-post="/extract/lynx/preview" hx-target="#lynx-preview">
+  <div class="row"><div class="shrink"><button class="secondary">Preview regenerate selected</button></div></div>
+  <div id="lynx-preview"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th></th><th>Game</th><th>.lnx</th><th>Header rotation</th><th>Configured</th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr><td><input type="checkbox" name="stems" value="{{ r.stem }}" {{ 'checked' if r.stale or not r.has_lnx }}></td>
+        <td>{{ r.stem }}</td><td>{% if r.has_lnx %}<span class="badge ok">yes</span>{% else %}<span class="badge warn">missing</span>{% endif %}</td>
+        <td>{{ r.current or '—' }}</td><td>{{ r.wanted }} {% if r.stale %}<span class="badge warn">differs</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No .lyx files in the lynx folder.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</form>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Import and extract</h1>
+<div class="panel">
+  <h2 style="margin-top:0">1 · Choose an archive</h2>
+  <form id="pick-form" class="stack" style="max-width:none" hx-post="/import/inspect" hx-target="#inspect" hx-indicator="#inspect-spin">
+    <input type="hidden" name="system" value="{{ system }}">
+    <div class="row">
+      <div><label for="path">Archive on the share (.zip / .7z)</label>
+        <input type="text" id="path" name="path" value="{{ path }}" placeholder="{{ state.cfg.paths.roms }}/_source/gb-roms.zip" required></div>
+      <div class="shrink"><button type="button" class="secondary"
+        hx-get="/files/browse?path={{ (state.cfg.paths.roms ~ '/_source') | urlencode }}&target=path" hx-target="#picker-slot">Browse…</button></div>
+    </div>
+    <div id="picker-slot"></div>
+    <div><button type="submit">Inspect</button> <span id="inspect-spin" class="htmx-indicator muted small">checking the file is complete (size stable for {{ state.cfg.stability.wait_seconds | int }}s) and reading it…</span></div>
+  </form>
+  <details style="margin-top:1rem"><summary>…or upload from this computer</summary>
+    <p class="muted small">Uploads stream to <code>_manager/uploads/</code>. For multi-GB sets, copying to the share over SMB is faster;
+      then pick the file above.</p>
+    <div class="row"><div><input type="file" id="upload-file" accept=".zip,.7z"></div>
+      <div class="shrink"><button type="button" class="secondary" onclick="rlmUpload()">Upload</button></div></div>
+    <progress id="upload-progress" value="0" max="100" style="width:100%;display:none"></progress>
+    <div id="upload-msg" class="small"></div>
+  </details>
+</div>
+<div id="inspect"></div>
+<div id="plan"></div>
+
+<script>
+function rlmUpload() {
+  const f = document.getElementById('upload-file').files[0];
+  const msg = document.getElementById('upload-msg'), bar = document.getElementById('upload-progress');
+  if (!f) { msg.textContent = 'Choose a file first.'; return; }
+  const xhr = new XMLHttpRequest();
+  xhr.open('PUT', '/import/upload?name=' + encodeURIComponent(f.name));
+  bar.style.display = 'block';
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) bar.value = 100 * e.loaded / e.total; };
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      document.getElementById('path').value = JSON.parse(xhr.responseText).path;
+      msg.textContent = 'Uploaded. Inspecting…';
+      htmx.trigger('#pick-form', 'submit');
+    } else { msg.textContent = 'Upload failed: ' + xhr.responseText; }
+  };
+  xhr.onerror = () => { msg.textContent = 'Upload failed (network error).'; };
+  xhr.send(f);
+}
+</script>
+{% endblock %}

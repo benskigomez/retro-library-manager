@@ -1,0 +1,40 @@
+<div class="panel">
+  <h2 style="margin-top:0">2 · Archive structure</h2>
+  <dl class="kv">
+    <dt>File</dt><dd><code>{{ path }}</code> ({{ info.size | size }})</dd>
+    <dt>Entries</dt><dd>{{ info.entry_count }} ({{ info.file_count }} files)</dd>
+    <dt>In subfolders</dt><dd>{{ info.in_subfolders }}</dd>
+    <dt>Inner archives</dt><dd>{{ info.inner_zip }} .zip · {{ info.inner_7z }} .7z</dd>
+    <dt>Top extensions</dt><dd>{% for ext, n in info.top_extensions %}<code>{{ ext }}</code> {{ n }}{{ ", " if not loop.last }}{% endfor %}</dd>
+  </dl>
+  <details><summary class="small">Sample names</summary>
+    <ul class="small mono">{% for n in info.samples %}<li>{{ n }}</li>{% endfor %}</ul>
+    {% if info.inner_sample_names %}<div class="small muted">Inside the first inner archives:</div>
+    <ul class="small mono">{% for n in info.inner_sample_names %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+  </details>
+
+  <h2>3 · System and import</h2>
+  <form class="stack" style="max-width:none" hx-post="/extract/plan" hx-target="#plan" hx-indicator="#plan-spin">
+    <input type="hidden" name="path" value="{{ path }}">
+    <div class="row">
+      <div><label>System (RetroBat folder)</label>
+        <select name="system" required>
+          {% for key, sd in systems.items() %}<option value="{{ key }}" {{ 'selected' if key == chosen }}>{{ key }} — {{ sd.name }}</option>{% endfor %}
+        </select>
+        <div class="small muted" style="margin-top:.2rem">
+          {% if ranking %}Detected: {% for k, score in ranking %}<b>{{ k }}</b>{{ ", " if not loop.last }}{% endfor %} — please confirm.
+          {% else %}Could not detect the system from file extensions; choose it.{% endif %}</div>
+      </div>
+      <div><label>Store in <code>_source</code> as <code>&lt;system&gt;-roms{{ '.zip' if path.endswith('.zip') else '.7z' }}</code></label>
+        <select name="import_mode">
+          {% if in_source %}<option value="none" selected>No — already in _source</option>
+          {% else %}
+          <option value="copy" selected>Copy into _source (verify MD5), then extract</option>
+          <option value="move">Move into _source (copy, verify, remove original)</option>
+          <option value="none">Don't import — extract from where it is</option>
+          {% endif %}
+        </select></div>
+    </div>
+    <div><button type="submit">Dry run</button> <span id="plan-spin" class="htmx-indicator muted small">planning…</span></div>
+  </form>
+</div>

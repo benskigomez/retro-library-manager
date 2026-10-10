@@ -1,0 +1,6 @@
+<div class="panel">
+  <h3 style="margin-top:0">Dry run: regenerate {{ rows | length }} header(s)</h3>
+  <ul class="small">{% for r in rows %}<li>{{ r.stem }}.lnx: {{ r.current or 'new' }} → <b>{{ r.wanted }}</b>
+    {% if r.has_lnx %}<span class="muted">(old .lnx goes to the trash)</span>{% endif %}</li>{% endfor %}</ul>
+  {% if rows %}<button type="button" hx-post="/extract/lynx/regen" hx-include="closest form">Regenerate</button>{% endif %}
+</div>
