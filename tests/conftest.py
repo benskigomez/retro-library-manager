@@ -85,8 +85,23 @@ def sevenz_bytes(members: dict[str, bytes], tmp: Path) -> bytes:
 
 
 def run_job(state, job_id: int) -> dict:
-    """Run a queued job synchronously in the test thread."""
-    job = state.queue.get(job_id)
-    state.db.execute("UPDATE jobs SET status='running' WHERE id=?", (job_id,))
-    state.queue.run_job(job)
+    """Run a queued job synchronously in the test thread.
+
+    When background workers are running (client fixture) a worker may claim
+    the job first; then wait for it to finish instead of running it twice.
+    """
+    import time
+
+    from app.jobs import TERMINAL
+
+    with state.queue._claim_lock, state.db.tx() as c:
+        claimed = c.execute(
+            "UPDATE jobs SET status='running' WHERE id=? AND status='queued'", (job_id,)).rowcount == 1
+    if claimed:
+        state.queue.run_job(state.queue.get(job_id))
+    else:
+        for _ in range(300):
+            if state.queue.get(job_id)["status"] in TERMINAL:
+                break
+            time.sleep(0.05)
     return state.queue.get(job_id)
