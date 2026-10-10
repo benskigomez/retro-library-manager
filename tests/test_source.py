@@ -34,6 +34,20 @@ def test_source_pages_and_entry_download(client, roms, src):
     assert client.get("/source/download", params={"path": str(src), "member": "nope"}).status_code == 404
 
 
+def test_filter_links_keep_archive_path(client, src):
+    import html
+    import re
+
+    page = client.get("/source/view", params={"path": str(src)}).text
+    href = html.unescape(re.search(r'href="(\?path=[^"]*show=exclude)"', page).group(1))
+    r = client.get("/source/view" + href)
+    assert r.status_code == 200 and "Terranigma (Europe).sfc" in r.text and "Chrono Trigger" not in r.text
+
+
+def test_import_page_prefills_path(client, src):
+    assert f'value="{src}"' in client.get("/import", params={"path": str(src)}).text
+
+
 def test_selected_entries_override_filter(state, roms, src):
     plan = extract.plan(state.cfg, state.system("snes"), src, select={"SNES/Terranigma (Europe).sfc"})
     assert [(r.base, r.decision) for r in plan.rows] == [("Terranigma (Europe).sfc", "include")]
