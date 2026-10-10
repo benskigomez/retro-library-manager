@@ -60,6 +60,24 @@ def test_enhancement_chips_are_staged_not_extracted(state, roms):
     assert job["summary"]["bios_staged"] == 2
 
 
+def test_enhancement_chip_inner_zips_are_unpacked_into_bios(state, roms):
+    src = make_zip(roms / "_source" / "snes-roms.zip", {
+        "SNES/CX4 (World) (Enhancement Chip).zip": zip_bytes({"CX4 (World) (Enhancement Chip).bin": b"c" * 3072}),
+        "SNES/[BIOS] Super NES CD-ROM - Boot ROM (Japan) (En) (v0.95) (Proto).zip":
+            zip_bytes({"[BIOS] Super NES CD-ROM - Boot ROM (Japan) (En) (v0.95) (Proto).sfc": b"b" * 512}),
+        "SNES/Pilotwings (USA).zip": zip_bytes({"Pilotwings (USA).sfc": ROM}),
+    })
+    p = extract.plan(state.cfg, state.system("snes"), src)
+    assert p.totals == {"bios": 2, "include": 1}
+    job = submit(state, src, "snes")
+    assert job["summary"]["bios_staged"] == 2
+    assert sorted(f.name for f in (roms / "_bios" / "snes").iterdir()) == [
+        "CX4 (World) (Enhancement Chip).bin", "[BIOS] Super NES CD-ROM - Boot ROM (Japan) (En) (v0.95) (Proto).sfc"]
+    assert [f.name for f in (roms / "snes").iterdir()] == ["Pilotwings (USA).sfc"]
+    # staged by stem: the next plan reports them present instead of staging zips again
+    assert extract.plan(state.cfg, state.system("snes"), src).totals == {"present": 3}
+
+
 def test_inner_zip_and_7z_per_game(state, roms, tmp_path):
     src = make_zip(roms / "_source" / "snes-roms.zip", {
         "Super Game (USA).zip": zip_bytes({"Super Game (USA).sfc": b"S" * 512, "Super Game (USA).nfo": b"x"}),

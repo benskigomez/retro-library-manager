@@ -95,6 +95,7 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
     stems = existing_stems(folder)
     names = existing_names(folder)
     bios_names = existing_names(bios_folder)
+    bios_stems = existing_stems(bios_folder)
     ignore = {e.lower() for e in cfg.ignore_extensions}
     accepted = sysdef.rom_extensions - set(ARCHIVE_EXTS)
     seen: set[str] = set()
@@ -109,13 +110,18 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
             continue
         bios_why = rules.bios_rule(base)
         if bios_why:
-            if base.casefold() in bios_names:
-                p.rows.append(Row(e.name, base, ROM, PRESENT, "BIOS already staged", f"_bios/{sysdef.key}/{base}"))
+            # A per-game archive holding firmware is unpacked into _bios (never for arcade sets).
+            inner = ext in ARCHIVE_EXTS and not sysdef.arcade
+            kind = INNER if inner else ROM
+            target = f"_bios/{sysdef.key}/{stem}.*" if inner else f"_bios/{sysdef.key}/{base}"
+            staged = stem.casefold() in bios_stems if inner else base.casefold() in bios_names
+            if staged:
+                p.rows.append(Row(e.name, base, kind, PRESENT, "BIOS already staged", target))
             elif "bios:" + base.casefold() in seen:
-                p.rows.append(Row(e.name, base, ROM, SKIPPED, "duplicate name in archive"))
+                p.rows.append(Row(e.name, base, kind, SKIPPED, "duplicate name in archive"))
             else:
                 seen.add("bios:" + base.casefold())
-                p.rows.append(Row(e.name, base, ROM, BIOS, bios_why, f"_bios/{sysdef.key}/{base}"))
+                p.rows.append(Row(e.name, base, kind, BIOS, bios_why, target))
             continue
 
         if sysdef.arcade:
@@ -223,6 +229,31 @@ def _unpack_inner(ctx, cfg: Config, sysdef: System, inner_archive: Path, folder:
         ctx.log(f"ADD  {src.name}  (from {row.base})")
 
 
+def _stage_inner_bios(ctx, cfg: Config, sysdef: System, inner_archive: Path, bios_folder: Path, row: Row) -> None:
+    """Unpack a per-game firmware archive into _bios/<system>/ (original names, no overwrite)."""
+    work = inner_archive.parent / "x"
+    archives.extract_all(inner_archive, work)
+    ignore = {e.lower() for e in cfg.ignore_extensions}
+    found = False
+    for root, _d, files in os.walk(work):
+        for f in sorted(files):
+            if Path(f).suffix.lower() in ignore:
+                continue
+            found = True
+            dest = bios_folder / f
+            if dest.exists():
+                ctx.count("present")
+                ctx.item(f, "present", f"from {row.base}: already staged")
+                continue
+            fsutil.copy_new(Path(root) / f, dest, ctx.check)
+            ctx.count("bios_staged")
+            ctx.item(f, "bios", f"from {row.base}, staged to _bios/{sysdef.key}/")
+            ctx.log(f"BIOS {f} (from {row.base}) -> _bios/{sysdef.key}/")
+    if not found:
+        ctx.count("skipped")
+        ctx.item(row.base, "skipped", "archive contains no files")
+
+
 def existing_stems_cache(ctx, folder: Path) -> set[str]:
     cache = getattr(ctx, "_stems", None)
     if cache is None:
@@ -261,10 +292,17 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
             try:
                 if r.decision == BIOS:
                     fsutil.ensure_dir(bios_folder)
-                    ex.write_member(r.entry, bios_folder / r.base, ctx.check)
-                    ctx.count("bios_staged")
-                    ctx.item(r.base, "bios", f"staged to _bios/{sysdef.key}/")
-                    ctx.log(f"BIOS {r.base} -> _bios/{sysdef.key}/")
+                    if r.kind == INNER:
+                        inner = ex.member_to_temp(r.entry, ctx.check)
+                        try:
+                            _stage_inner_bios(ctx, cfg, sysdef, inner, bios_folder, r)
+                        finally:
+                            shutil.rmtree(inner.parent, ignore_errors=True)
+                    else:
+                        ex.write_member(r.entry, bios_folder / r.base, ctx.check)
+                        ctx.count("bios_staged")
+                        ctx.item(r.base, "bios", f"staged to _bios/{sysdef.key}/")
+                        ctx.log(f"BIOS {r.base} -> _bios/{sysdef.key}/")
                 elif r.kind in (ROM, SET):
                     ex.write_member(r.entry, folder / r.base, ctx.check)
                     existing_stems_cache(ctx, folder).add(Path(r.base).stem.casefold())
