@@ -96,15 +96,15 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
         if ext in ignore:
             p.rows.append(Row(e.name, base, OTHER, SKIPPED, f"ignored file type {ext}"))
             continue
-        if rules.bios_prefix and base.startswith(rules.bios_prefix):
+        bios_why = rules.bios_rule(base)
+        if bios_why:
             if base.casefold() in bios_names:
                 p.rows.append(Row(e.name, base, ROM, PRESENT, "BIOS already staged", f"_bios/{sysdef.key}/{base}"))
             elif "bios:" + base.casefold() in seen:
                 p.rows.append(Row(e.name, base, ROM, SKIPPED, "duplicate name in archive"))
             else:
                 seen.add("bios:" + base.casefold())
-                p.rows.append(Row(e.name, base, ROM, BIOS, f"name starts with {rules.bios_prefix}",
-                                  f"_bios/{sysdef.key}/{base}"))
+                p.rows.append(Row(e.name, base, ROM, BIOS, bios_why, f"_bios/{sysdef.key}/{base}"))
             continue
 
         if sysdef.arcade:

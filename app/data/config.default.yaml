@@ -33,6 +33,8 @@ ignore_extensions: [.txt, .nfo, .diz, .url, .sfv, .md5]
 
 filters:
   bios_prefix: "[BIOS]"
+  bios_patterns:                                # also staged as BIOS, never extracted as games
+    - '\(Enhancement Chip\)'                    # No-Intro SNES DSP/CX4/ST01x/SGB firmware
   include:
     - '\(([^)]*, )?(USA|World)(, [^)]*)?\)'    # No-Intro/Redump: (USA), (World), (USA, Europe), (Japan, USA)
     - '\(Japan\) \(En[,)]'                     # Japanese releases already in English

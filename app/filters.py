@@ -44,16 +44,29 @@ class RuleSet:
     def __init__(self, cfg: FiltersCfg, system: str | None = None):
         override = cfg.systems.get(system) if system else None
         self.bios_prefix = cfg.bios_prefix
+        self.bios_patterns = cfg.bios_patterns
         self.include = override.include if override and override.include is not None else cfg.include
         self.exclude = override.exclude if override and override.exclude is not None else cfg.exclude
         self.allow = list(override.allow) if override else []
         self.deny = list(override.deny) if override else []
         self.scope = f"{system} override" if override else "global"
 
-    def decide(self, entry: str) -> Decision:
+    def bios_rule(self, entry: str) -> str | None:
+        """Why this entry is a BIOS/firmware file, or None."""
         name = basename(entry)
         if self.bios_prefix and name.startswith(self.bios_prefix):
-            return Decision(BIOS, f"name starts with {self.bios_prefix}")
+            return f"name starts with {self.bios_prefix}"
+        for pat in self.bios_patterns:
+            m = _rx(pat).search(name)
+            if m:
+                return f"firmware {m.group(0)}"
+        return None
+
+    def decide(self, entry: str) -> Decision:
+        name = basename(entry)
+        why = self.bios_rule(name)
+        if why:
+            return Decision(BIOS, why)
         for spec in self.deny:
             if _title_match(spec, name):
                 return Decision(EXCLUDE, f"deny-list: {spec}")

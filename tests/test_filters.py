@@ -21,6 +21,8 @@ def rules() -> RuleSet:
     ("007 - Blood Stone (Canada) (Fr).zip", EXCLUDE),
     ("[BIOS] Atari Lynx (World).lyx", BIOS),
     ("GB/[BIOS] Nintendo Game Boy Boot ROM (World) (Rev 1).gb", BIOS),
+    ("CX4 (World) (Enhancement Chip).bin", BIOS),
+    ("ST010 (Japan, USA) (Enhancement Chip).bin", BIOS),
 ])
 def test_real_world_names(rules, name, expected):
     assert rules.decide(name).category == expected

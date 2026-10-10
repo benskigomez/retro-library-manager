@@ -60,11 +60,13 @@ class SystemFilterCfg(BaseModel):
 
 class FiltersCfg(BaseModel):
     bios_prefix: str = "[BIOS]"
+    # Other names that are firmware rather than games, e.g. No-Intro SNES "(Enhancement Chip)" dumps.
+    bios_patterns: list[str] = Field(default_factory=lambda: [r"\(Enhancement Chip\)"])
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
     systems: dict[str, SystemFilterCfg] = Field(default_factory=dict)
 
-    @field_validator("include", "exclude")
+    @field_validator("include", "exclude", "bios_patterns")
     @classmethod
     def _compile(cls, v: list[str]) -> list[str]:
         import re

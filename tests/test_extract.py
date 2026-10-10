@@ -47,6 +47,19 @@ def test_subfolder_entries_extract_flat_and_bios_staged(state, roms):
     assert job["summary"]["bios_staged"] == 1
 
 
+def test_enhancement_chips_are_staged_not_extracted(state, roms):
+    src = make_zip(roms / "_source" / "snes-roms.zip", {
+        "Pilotwings (USA).sfc": ROM,
+        "DSP1 (World) (Enhancement Chip).bin": b"d" * 8192,
+        "Super Game Boy SGB-CPU (World) (Enhancement Chip).bin": b"s" * 256,
+    })
+    job = submit(state, src, "snes")
+    assert [p.name for p in (roms / "snes").iterdir()] == ["Pilotwings (USA).sfc"]
+    assert sorted(p.name for p in (roms / "_bios" / "snes").iterdir()) == [
+        "DSP1 (World) (Enhancement Chip).bin", "Super Game Boy SGB-CPU (World) (Enhancement Chip).bin"]
+    assert job["summary"]["bios_staged"] == 2
+
+
 def test_inner_zip_and_7z_per_game(state, roms, tmp_path):
     src = make_zip(roms / "_source" / "snes-roms.zip", {
         "Super Game (USA).zip": zip_bytes({"Super Game (USA).sfc": b"S" * 512, "Super Game (USA).nfo": b"x"}),

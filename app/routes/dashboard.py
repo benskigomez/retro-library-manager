@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 
 from .. import fsutil
-from ..library import scan_system
+from ..library import _is_meta, scan_system
 from . import redirect, render, st
 
 router = APIRouter()
@@ -36,8 +36,11 @@ def system_page(request: Request, key: str, show: str = "all"):
             if not e.is_file(follow_symlinks=False) or e.name.startswith("."):
                 continue
             ext = Path(e.name).suffix.lower()
-            kind = "game" if ext in accepted else ("archive" if ext in (".zip", ".7z") else "other")
-            if show == "flagged" and kind == "game":
+            if _is_meta(e.name):
+                kind = "meta"
+            else:
+                kind = "game" if ext in accepted else ("archive" if ext in (".zip", ".7z") else "other")
+            if show == "flagged" and kind in ("game", "meta"):
                 continue
             files.append({"name": e.name, "size": e.stat().st_size, "kind": kind})
     jobs = s.queue.recent(20, system=key)
