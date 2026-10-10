@@ -51,6 +51,10 @@ class Database:
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(schema)
         self._conn.commit()
+        # SQLite creates files 0644 regardless of umask; keep the share's a+rwX convention.
+        from . import fsutil
+
+        fsutil.fix_perms(self.path)
 
     @contextmanager
     def tx(self):

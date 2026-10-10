@@ -51,6 +51,15 @@ def test_trash_and_restore_keep_relative_paths(tmp_path):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permissions")
+def test_sqlite_db_gets_a_plus_rw(tmp_path):
+    from app.db import Database
+
+    db = Database(tmp_path / "x.db")
+    db.close()
+    assert stat.S_IMODE((tmp_path / "x.db").stat().st_mode) == 0o666
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permissions")
 def test_fix_perms_a_plus_rwX(tmp_path):
     d = tmp_path / "d"
     d.mkdir(mode=0o700)
