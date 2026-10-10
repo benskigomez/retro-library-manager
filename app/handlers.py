@@ -13,6 +13,12 @@ def register_handlers(state: State) -> None:
     q.register("bios_install")(lambda ctx: bios.run_install_mounted(state, ctx))
     q.register("bios_export")(lambda ctx: bios.run_export(state, ctx))
     q.register("bios_stage")(lambda ctx: bios.run_stage_from_archive(state, ctx))
+    from .arcade import jobs as arcade
+
+    q.register("mame_import")(lambda ctx: arcade.run_import(state, ctx))
+    q.register("mame_verify")(lambda ctx: arcade.run_verify(state, ctx))
+    q.register("mame_hide")(lambda ctx: arcade.run_hide(state, ctx))
+    q.register("mame_bundle")(lambda ctx: arcade.run_bundle(state, ctx))
     q.register("lynx_regen")(lambda ctx: extract_lynx_regen(state, ctx))
 
 

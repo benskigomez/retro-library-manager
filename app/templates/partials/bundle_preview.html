@@ -1,0 +1,16 @@
+{% set t = plan.totals %}
+<div class="panel" style="margin-top:.6rem">
+  <h3 style="margin-top:0">Dry run: copy sets into {{ system }}/</h3>
+  <div class="totals">
+    <span class="badge ok">{{ t.get('include', 0) }} to copy</span><span class="badge warn">{{ t.get('present', 0) }} already present</span>
+    <span class="badge">{{ t.get('skipped', 0) }} skipped</span>{% if t.get('exclude') %}<span class="badge bad">{{ t.get('exclude') }} denied</span>{% endif %}
+  </div>
+  <details><summary class="small">List</summary><ul class="small">
+    {% for r in plan.rows %}<li><code>{{ r.base }}</code> — {{ r.decision }} <span class="muted">{{ r.rule }}</span></li>{% endfor %}</ul></details>
+  <form method="post" action="/arcade/bundle">
+    <input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="system" value="{{ system }}">
+    <p><label style="font-weight:normal"><input type="checkbox" name="hide" value="1" checked> then re-run hiding of BIOS/device/mechanical sets</label><br>
+      <label style="font-weight:normal"><input type="checkbox" name="confirm_closed" value="1"> RetroBat is fully closed (required for hiding)</label></p>
+    <button {{ 'disabled' if not t.get('include') }}>Copy {{ t.get('include', 0) }} set(s)</button>
+  </form>
+</div>

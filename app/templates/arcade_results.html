@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Verify results · <a href="/jobs/{{ job.id }}">job #{{ job.id }}</a></h1>
+<p class="muted small">{{ job.params.system }} · {{ job.ended_at }}</p>
+<div class="totals">
+  <a class="badge {{ 'ok' if not status }}" href="?cls={{ cls }}">all</a>
+  {% for k in ['good', 'missing', 'unknown'] %}<a class="badge s-{{ k }}" href="?status={{ k }}&cls={{ cls }}">{{ k }} {{ counts.get(k, 0) }}</a>{% endfor %}
+</div>
+<div class="totals">
+  <a class="badge {{ 'ok' if not cls }}" href="?status={{ status }}">all classes</a>
+  {% for k, n in classes.most_common() %}<a class="badge {{ 'ok' if cls == k }}" href="?status={{ status }}&cls={{ k }}">{{ k }} {{ n }}</a>{% endfor %}
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>Set</th><th>Class</th><th>Status</th><th>Details</th></tr></thead>
+  <tbody>{% for i in items[:5000] %}
+    <tr><td><code>{{ i.name }}</code></td><td>{{ i.data.cls }}</td><td><span class="badge s-{{ i.status }}">{{ i.status }}</span></td>
+      <td class="small">{{ i.detail }}
+        {% if i.data.missing %}<details><summary>{{ i.data.missing | length }} missing ROM(s)</summary><ul>
+          {% for x in i.data.missing[:50] %}<li><code>{{ x.rom }}</code> crc {{ x.crc }} — from <b>{{ x.supplier }}.zip</b>
+            {% if x.supplier_present %}<span class="badge warn">zip present but ROM missing/bad</span>{% else %}<span class="badge bad">zip missing</span>{% endif %}</li>{% endfor %}
+        </ul></details>{% endif %}
+        {% for n in i.data.notes or [] %}<div class="muted">{{ n }}</div>{% endfor %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endblock %}

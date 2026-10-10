@@ -1,0 +1,20 @@
+{% set todo = changes | rejectattr('action', 'equalto', 'already') | list %}
+<div class="panel" style="margin-top:.6rem">
+  <h3 style="margin-top:0">Dry run: {{ system }}/gamelist.xml</h3>
+  <div class="totals">
+    <span class="badge ok">{{ changes | selectattr('action', 'equalto', 'update') | list | length }} existing entries to hide</span>
+    <span class="badge ok">{{ changes | selectattr('action', 'equalto', 'add') | list | length }} entries to add (hidden)</span>
+    <span class="badge">{{ changes | selectattr('action', 'equalto', 'already') | list | length }} already hidden</span>
+  </div>
+  <details><summary class="small">List</summary><ul class="small">
+    {% for c in changes %}<li><code>{{ c.name }}</code> — {{ classes[c.name] }} · {{ c.action }}</li>{% endfor %}</ul></details>
+  {% if todo %}
+  <div class="flash warn">RetroBat rewrites gamelist.xml when it exits. <b>Close RetroBat completely</b> (including EmulationStation in the tray) before applying,
+    or your change will be lost. A backup {{ 'is written next to the file' if exists else 'is not needed (no gamelist.xml yet)' }}.</div>
+  <form method="post" action="/arcade/hide">
+    <input type="hidden" name="system" value="{{ system }}">
+    <label style="font-weight:normal"><input type="checkbox" name="confirm_closed" value="1" required> RetroBat is fully closed</label>
+    <p><button>Hide {{ todo | length }} set(s)</button></p>
+  </form>
+  {% endif %}
+</div>

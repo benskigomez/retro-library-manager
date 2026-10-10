@@ -1,0 +1,20 @@
+{% if not loaded %}<div class="flash warn">Import a MAME -listxml first.</div>
+{% elif q and not rows %}<p class="muted">No machines match "{{ q }}".</p>
+{% elif rows %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Short name</th><th>Title</th><th>Needs</th><th>You have it all?</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td><code>{{ r.m.name }}</code><div class="small muted">{{ r.cls }}</div></td>
+      <td>{{ r.m.description }}<div class="small muted">{{ r.m.year }} · {{ r.m.manufacturer }}</div></td>
+      <td class="small">
+        {% if r.parent %}parent <code>{{ r.parent }}</code> {% if r.have[r.parent] %}✓{% else %}<span style="color:var(--bad)">✗</span>{% endif %}<br>{% endif %}
+        {% if r.bios %}BIOS <code>{{ r.bios }}</code> {% if r.have[r.bios] %}✓{% else %}<span style="color:var(--bad)">✗</span>{% endif %}<br>{% endif %}
+        {% for d in r.devices %}device <code>{{ d }}</code> {% if r.have[d] %}✓{% else %}<span style="color:var(--bad)">✗</span>{% endif %}<br>{% endfor %}
+        {% if not r.parent and not r.bios and not r.devices %}<span class="muted">nothing else</span>{% endif %}</td>
+      <td>{% if not r.have[r.m.name] %}<span class="badge">set not present</span>
+        {% elif r.complete %}<span class="badge ok">yes, verified</span>
+        {% else %}<span class="badge bad">{{ r.missing | length }} ROM(s) missing</span>
+          <div class="small">{% for x in r.missing[:5] %}{{ x.rom }} ← {{ x.supplier }}.zip<br>{% endfor %}</div>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+{% endif %}

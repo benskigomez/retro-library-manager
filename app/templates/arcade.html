@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Arcade tools</h1>
+
+<div class="panel">
+  <h2 style="margin-top:0">MAME reference data</h2>
+  {% if loaded %}
+    <p><span class="badge ok">loaded</span> MAME <b>{{ meta.build or '?' }}</b> · {{ meta.machines }} machines
+      <span class="muted small">from {{ meta.source }}</span></p>
+  {% else %}
+    <div class="flash warn">No reference data yet. Generate it on the desktop with the MAME version RetroBat uses (currently 0.289):
+      <pre style="margin:.4rem 0 0">cd G:\RetroBat\emulators\mame
+.\mame.exe -listxml &gt; mame0289.xml</pre></div>
+  {% endif %}
+  <form id="xml-form" class="stack" style="max-width:none" method="post" action="/arcade/import">
+    <div class="row">
+      <div><label for="xml-path">listxml file on the share</label><input type="text" id="xml-path" name="path" required
+        placeholder="{{ state.cfg.paths.roms }}/_manager/uploads/mame0289.xml"></div>
+      <div class="shrink"><button type="button" class="secondary"
+        hx-get="/files/browse?path={{ state.cfg.paths.roms | urlencode }}&target=xml-path&exts=.xml" hx-target="#xml-picker">Browse…</button></div>
+      <div class="shrink"><button type="submit">Import</button></div>
+    </div>
+    <div id="xml-picker"></div>
+  </form>
+  <details style="margin-top:.6rem"><summary class="small">…or upload it</summary>
+    <div class="row"><div><input type="file" id="xml-file" accept=".xml"></div>
+      <div class="shrink"><button type="button" class="secondary" onclick="rlmXmlUpload()">Upload</button></div></div>
+    <progress id="xml-progress" value="0" max="100" style="width:100%;display:none"></progress><div id="xml-msg" class="small"></div>
+  </details>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Verify and classify sets</h2>
+  <p class="small muted">Checks the CRC32 of every ROM each set needs — including parents, BIOS sets and devices — against the zips you have.
+    Only sets present in the folder are reported. ROMs with no good dump known are informational.</p>
+  <form method="post" action="/arcade/verify" class="row">
+    <div class="shrink"><select name="system">{% for k in systems %}<option>{{ k }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button {{ 'disabled' if not loaded }}>Verify</button></div>
+    {% if last_verify %}<div class="shrink small">Last result: <a href="/arcade/results/{{ last_verify.id }}">job #{{ last_verify.id }}</a>
+      — {% for k in ['good', 'missing', 'unknown'] %}{{ k }} {{ last_verify.summary.get(k, 0) }}{{ ', ' if not loop.last }}{% endfor %}</div>{% endif %}
+  </form>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Hide non-games in gamelist.xml</h2>
+  <p class="small muted">Marks BIOS, device and mechanical (pinball) sets <code>hidden=true</code> so they stop cluttering RetroBat. Adds entries where missing.</p>
+  <form hx-post="/arcade/hide/preview" hx-target="#hide-preview" class="row">
+    <div class="shrink"><select name="system">{% for k in systems %}<option>{{ k }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button class="secondary" {{ 'disabled' if not loaded }}>Preview</button></div>
+  </form>
+  <div id="hide-preview"></div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Short-name lookup</h2>
+  <form hx-get="/arcade/lookup" hx-target="#lookup" class="row">
+    <div><input type="text" name="q" placeholder="Spy Hunter" autocomplete="off"
+      hx-get="/arcade/lookup" hx-trigger="keyup changed delay:400ms" hx-target="#lookup" hx-include="closest form"></div>
+    <div class="shrink"><select name="system">{% for k in systems %}<option>{{ k }}</option>{% endfor %}</select></div>
+    <div class="shrink"><button>Search</button></div>
+  </form>
+  <div id="lookup"></div>
+</div>
+
+<div class="panel">
+  <h2 style="margin-top:0">Install a BIOS / device bundle</h2>
+  <p class="small muted">An archive of set zips (e.g. neogeo.zip, midssio.zip…). Inner zips are copied as-is; existing files are skipped.</p>
+  <form class="stack" style="max-width:none" hx-post="/arcade/bundle/preview" hx-target="#bundle-preview">
+    <div class="row">
+      <div><input type="text" id="bundle-path" name="path" required placeholder="{{ state.cfg.paths.roms }}/_source/mame-bios-devices.zip"></div>
+      <div class="shrink"><button type="button" class="secondary" hx-get="/files/browse?path={{ (state.cfg.paths.roms ~ '/_source') | urlencode }}&target=bundle-path" hx-target="#bundle-picker">Browse…</button></div>
+      <div class="shrink"><select name="system">{% for k in systems %}<option>{{ k }}</option>{% endfor %}</select></div>
+      <div class="shrink"><button>Preview</button></div>
+    </div>
+    <div id="bundle-picker"></div>
+  </form>
+  <div id="bundle-preview"></div>
+</div>
+
+<script>
+function rlmXmlUpload() {
+  const f = document.getElementById('xml-file').files[0];
+  const msg = document.getElementById('xml-msg'), bar = document.getElementById('xml-progress');
+  if (!f) { msg.textContent = 'Choose a file first.'; return; }
+  const xhr = new XMLHttpRequest();
+  xhr.open('PUT', '/arcade/upload?name=' + encodeURIComponent(f.name));
+  bar.style.display = 'block';
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) bar.value = 100 * e.loaded / e.total; };
+  xhr.onload = () => {
+    if (xhr.status === 200) { document.getElementById('xml-path').value = JSON.parse(xhr.responseText).path; msg.textContent = 'Uploaded — click Import.'; }
+    else { msg.textContent = 'Upload failed: ' + xhr.responseText; }
+  };
+  xhr.send(f);
+}
+</script>
+{% endblock %}
