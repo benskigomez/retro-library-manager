@@ -74,6 +74,42 @@ def test_identify_mixed_archive(state, roms):
     assert [i.entry for i in unknown] == ["weird.xyz"]
 
 
+def pce_data_track_with_pregap():
+    """Redump layout: track 2 .bin starts with a 2-second (150-sector) pregap, then the data."""
+    pregap = 150 * 2352
+    data = bytearray(pregap + 2352 * 4)
+    off = pregap + 2352 + 16 + 0x20  # sector 1 of the data area, after the 16-byte sync/header
+    data[off:off + 23] = b"PC Engine CD-ROM SYSTEM"
+    return bytes(data)
+
+
+REDUMP_CUE = (b'FILE "Exile (USA) (Track 01).bin" BINARY\r\n  TRACK 01 AUDIO\r\n    INDEX 01 00:00:00\r\n'
+              b'FILE "Exile (USA) (Track 02).bin" BINARY\r\n  TRACK 02 MODE1/2352\r\n    INDEX 00 00:00:00\r\n'
+              b'    INDEX 01 00:02:00\r\n'
+              b'FILE "Exile (USA) (Track 03).bin" BINARY\r\n  TRACK 03 AUDIO\r\n    INDEX 01 00:00:00\r\n')
+
+
+def test_pce_cd_with_pregap_is_identified(state, roms):
+    src = make_zip(roms / "incoming" / "Exile (USA).zip", {
+        "Exile (USA).cue": REDUMP_CUE,
+        "Exile (USA) (Track 01).bin": b"\x01" * (2352 * 300),   # audio warning track
+        "Exile (USA) (Track 02).bin": pce_data_track_with_pregap(),
+        "Exile (USA) (Track 03).bin": b"\x02" * 2352,
+    })
+    ident = {i.entry: i for i in identify(src, state.systems)}["Exile (USA).cue"]
+    assert ident.system == "pcenginecd" and ident.tracks == 3, ident
+
+
+def test_single_bin_disc_data_track_after_audio(state, roms):
+    audio = 2352 * 75 * 20  # 20 s of audio before the data track, ~3.5 MB
+    image = bytearray(audio + 2352 * 4)
+    image[audio + 16:audio + 16 + 14] = b"SEGADISCSYSTEM"
+    cue = (b'FILE "Game (USA).bin" BINARY\n  TRACK 01 AUDIO\n    INDEX 01 00:00:00\n'
+           b'  TRACK 02 MODE1/2352\n    INDEX 01 00:20:00\n')
+    src = make_zip(roms / "incoming" / "g.zip", {"Game (USA).cue": cue, "Game (USA).bin": bytes(image)})
+    assert {i.entry: i for i in identify(src, state.systems)}["Game (USA).cue"].system == "segacd"
+
+
 def test_sniff_disc_signatures():
     gc = bytearray(64)
     gc[0x1C:0x20] = b"\xc2\x33\x9f\x3d"
@@ -90,6 +126,7 @@ def test_identify_flow_end_to_end(client, roms):
     src = make_zip(roms / "incoming" / "mixed.zip", mixed_members())
     r = client.post("/identify/scan", data={"path": str(src)})
     assert r.status_code == 200 and "Needs your choice" in r.text
+    assert "3 files: 1 disc sheet(s) + 2 track files" in r.text  # a .cue and its tracks count as one game
     assigned = re.search(r'name="assigned" value="([^"]*)"', r.text).group(1).replace("&#34;", '"').replace("&quot;", '"')
     form = {"path": str(src), "assigned": assigned, "keep": "1"}
     for m in re.finditer(r'name="amb_members_(\d+)" value="([^"]*)"', r.text):

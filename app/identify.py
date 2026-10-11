@@ -11,6 +11,7 @@ Anything still ambiguous is left for the operator to assign.
 from __future__ import annotations
 
 import io
+import re
 import tempfile
 import time
 import zipfile
@@ -18,7 +19,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import archives
+from . import archives, chd
 from .systems import ARCHIVE_EXTS, System
 
 FOLDER_ALIASES = {
@@ -38,6 +39,7 @@ FOLDER_ALIASES = {
 }
 
 SNIFF_BYTES = 64 * 1024
+MAX_DATA_OFFSET = 16 * 1024 * 1024  # never read further than this into a track to find its header
 INNER_PEEK_MAX = 512 * 1024 * 1024
 INNER_SAMPLE = 5
 
@@ -81,6 +83,36 @@ def sniff_disc(data: bytes, total_size: int = 0) -> tuple[str | None, list[str],
             return "ps2", [], "PlayStation volume, DVD-sized"
         return None, ["psx", "ps2"], "PlayStation volume descriptor (PS1 or a CD-based PS2 game)"
     return None, [], ""
+
+
+_MSF = re.compile(r"(\d+):(\d+):(\d+)")
+
+
+def cue_data_tracks(text: str) -> list[tuple[str, int]]:
+    """(file name, byte offset of INDEX 01) for every data (non-AUDIO) track of a .cue.
+
+    Redump-style sheets put a 2-second pregap at the start of a data track's .bin
+    (e.g. PC Engine CD track 2), so the disc header is not at byte 0 of the file.
+    """
+    out: list[tuple[str, int]] = []
+    cur_file, mode, sector = None, None, 2352
+    for line in text.splitlines():
+        words = line.split()
+        if not words:
+            continue
+        kw = words[0].upper()
+        if kw == "FILE":
+            refs = chd.descriptor_refs(line, ".cue")
+            cur_file = refs[0] if refs else None
+        elif kw == "TRACK" and len(words) >= 3:
+            mode = words[2].upper()
+            sector = 2048 if mode.endswith("/2048") else 2336 if mode.endswith("/2336") else 2352
+        elif kw == "INDEX" and len(words) >= 3 and words[1] == "01" and cur_file and mode and mode != "AUDIO":
+            m = _MSF.fullmatch(words[2])
+            if m:
+                frames = (int(m.group(1)) * 60 + int(m.group(2))) * 75 + int(m.group(3))
+                out.append((cur_file, frames * sector))
+    return out
 
 
 # ---- helpers ------------------------------------------------------------------------------
@@ -213,11 +245,24 @@ def _identify_file(source: Path, e: archives.Entry, systems: dict[str, System], 
     if e.name in groups:  # .cue / .gdi with its tracks
         members, _missing = groups[e.name]
         total = e.size + sum(by_name[m].size for m in members if m in by_name)
-        for m in members[:3]:
+        probes: list[tuple[str, int]] = []
+        if ext == ".cue":
             try:
-                system, cand, how = sniff_disc(archives.read_member(source, m, SNIFF_BYTES), total)
+                text = archives.read_member(source, e.name, 1024 * 1024).decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001
+                text = ""
+            by_base = {m.rsplit("/", 1)[-1].casefold(): m for m in members}
+            for fname, offset in cue_data_tracks(text):
+                member = by_base.get(fname.replace("\\", "/").rsplit("/", 1)[-1].casefold())
+                if member and offset <= MAX_DATA_OFFSET:
+                    probes.append((member, offset))
+        probes += [(m, 0) for m in members[:3] if (m, 0) not in probes]
+        for member, offset in probes[:6]:
+            try:
+                data = archives.read_member(source, member, offset + SNIFF_BYTES)[offset:]
             except Exception:  # noqa: BLE001
                 continue
+            system, cand, how = sniff_disc(data, total)
             if system or cand:
                 return _with_hint(Ident(e.name, total, system, cand, how=how, tracks=len(members)), systems)
         disc = [k for k in owners if systems[k].disc]
