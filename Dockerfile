@@ -4,7 +4,9 @@ FROM python:3.12-slim-trixie
 RUN apt-get update \
  && apt-get install -y --no-install-recommends unzip 7zip mame-tools tini \
  && rm -rf /var/lib/apt/lists/* \
- && command -v chdman 7zz unzip zipinfo
+ && { command -v 7zz >/dev/null || ln -s "$(command -v 7z)" /usr/local/bin/7zz; } \
+ && for t in chdman 7zz unzip zipinfo; do command -v "$t" >/dev/null || { echo "missing $t"; exit 1; }; done \
+ && chdman | head -1
 
 WORKDIR /app
 COPY requirements.txt .
