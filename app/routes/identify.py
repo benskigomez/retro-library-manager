@@ -128,7 +128,8 @@ async def run(request: Request):
         sysdef = s.system(system)
         mode = form.get(f"mode_{system}")
         convert = (mode == "chd") if (sysdef.disc and mode in ("chd", "original")) else None
-        s.queue.submit("extract", f"Identify: {len(entries)} file(s) from {p.name} → {system}",
+        n = len(entries)
+        s.queue.submit("extract", f"Identify: {n} {'item' if n == 1 else 'items'} from {p.name} → {system}",
                        {"archive": str(p), "system": system, "import_mode": "none", "select": entries,
                         "override": False, "convert": convert}, system=system)
     return redirect(request, "/jobs")

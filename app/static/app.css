@@ -51,7 +51,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table-wrap { overflow-x: auto; }
 form.stack { display: flex; flex-direction: column; gap: .7rem; max-width: 720px; }
 label { font-weight: 600; font-size: .9em; display: block; margin-bottom: .2rem; }
-input[type=text], input[type=password], input[type=number], select, textarea {
+input[type=text], input[type=search], input[type=password], input[type=number], select, textarea {
   width: 100%; padding: .45rem .55rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
 textarea { font-family: var(--mono); font-size: .85em; min-height: 18rem; }
 .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; }
