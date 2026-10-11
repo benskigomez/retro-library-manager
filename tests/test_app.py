@@ -34,6 +34,10 @@ def test_dashboard_reads_library(client, roms):
     assert body.count("unrecognized") == 1  # only lynx's .foo
     r = client.get("/system/lynx")
     assert r.status_code == 200 and "Weird.foo" in r.text
+    scan = client.app.state.rlm.library.get(client.app.state.rlm.cfg, client.app.state.rlm.systems)
+    keys = [s.key for s in scan.systems]
+    assert keys == sorted(keys, key=str.casefold)  # dashboard cards in alphabetical order
+    assert body.index('href="/system/gb"') < body.index('href="/system/lynx"')
 
 
 def test_job_queue_sse_and_history(client):

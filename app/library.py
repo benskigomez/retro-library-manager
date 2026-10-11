@@ -100,7 +100,7 @@ class LibraryScan:
 
 
 def scan_library(cfg: Config, systems: dict[str, System]) -> LibraryScan:
-    statuses = [scan_system(cfg, s) for s in systems.values()]
+    statuses = [scan_system(cfg, s) for _key, s in sorted(systems.items(), key=lambda kv: kv[0].casefold())]
     unknown: list[str] = []
     if cfg.roms.is_dir():
         for e in os.scandir(cfg.roms):
