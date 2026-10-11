@@ -154,7 +154,7 @@ def extract_all(archive: Path, dest_dir: Path) -> None:
     if suffix == ".7z":
         exe = _sevenzip_bin()
         if exe:
-            proc = subprocess.run([exe, "x", "-y", "-bd", "-snld-", f"-o{dest_dir}", str(archive)],
+            proc = subprocess.run([exe, "x", "-y", "-bd", f"-o{dest_dir}", str(archive)],
                                   capture_output=True)
             if proc.returncode != 0:
                 raise RuntimeError(proc.stderr.decode("utf-8", "replace").strip() or "7z extraction failed")

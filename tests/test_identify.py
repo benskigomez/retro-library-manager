@@ -197,6 +197,11 @@ def test_upload_left_in_place_when_a_job_fails(state, roms):
     job = run_job(state, queue_upload_cleanup(state, up, [failed]))
     assert job["status"] == "done" and "left_in_place" in job["summary"]
     assert up.exists()
+    # a job that finished "done" but with failed items does not count as a success either
+    partial = state.queue.submit("extract", "t", {"archive": str(up), "system": "gb", "import_mode": "none"})
+    state.db.execute("UPDATE jobs SET status='done', summary=? WHERE id=?", ('{"added": 3, "failed": 2}', partial))
+    job = run_job(state, queue_upload_cleanup(state, up, [partial]))
+    assert "2 failed item(s)" in job["summary"]["left_in_place"] and up.exists()
     # paths outside _manager/uploads are never cleaned up
     other = make_zip(roms / "incoming" / "x.zip", {"a.gb": b"x"})
     assert queue_upload_cleanup(state, other, [failed]) is None

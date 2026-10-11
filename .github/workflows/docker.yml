@@ -40,9 +40,21 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=sha
+      # Build locally first and test the real tools (7zz, unzip, chdman) inside the image,
+      # running as nobody:users like on Unraid. Only a passing image is pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: rlm:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Container smoke test
+        run: docker run --rm -i --user 99:100 rlm:ci python - < tests/container_smoke.py
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

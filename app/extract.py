@@ -679,9 +679,12 @@ def cleanup_upload(state, ctx) -> dict:
             break
         ctx.check()
         time.sleep(2)
-    bad = [j for j in jobs if j["status"] != "done"]
+    # "done" with failed items (e.g. some games could not be unpacked) is not a success either.
+    bad = [j for j in jobs if j["status"] != "done" or (j["summary"].get("failed") or 0) > 0]
     if bad:
-        detail = ", ".join(f"#{j['id']} {j['status']}" for j in bad)
+        detail = ", ".join(f"#{j['id']} {j['status']}"
+                           + (f" with {j['summary']['failed']} failed item(s)" if j["summary"].get("failed") else "")
+                           for j in bad)
         ctx.log(f"Not cleaning up {path.name}: job(s) {detail}. The upload stays so you can retry.")
         ctx.count("kept")
         return {"left_in_place": detail}
