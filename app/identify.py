@@ -312,6 +312,52 @@ def _with_hint(ident: Ident, systems: dict[str, System]) -> Ident:
     return ident
 
 
+def name_hint(filename: str, systems: dict[str, System]) -> str | None:
+    """A system named in an archive's file name: "nointro.32x.zip", "Genesis Collection.7z"."""
+    stem = Path(filename).stem
+    words = [w for w in re.split(r"[^0-9a-z]+", stem.casefold()) if w]
+    for size in (3, 2, 1):  # longest phrase first: "game boy advance" before "game boy"
+        for i in range(len(words) - size + 1):
+            phrase = " ".join(words[i:i + size])
+            if phrase in systems:
+                return phrase
+            alias = FOLDER_ALIASES.get(phrase)
+            if alias in systems:
+                return alias
+    return None
+
+
+@dataclass
+class Detection:
+    system: str
+    count: int
+    total: int
+    why: str
+
+
+def rank_systems(source: Path, systems: dict[str, System], ignore: set[str] | None = None,
+                 time_budget: float = 30.0) -> list[Detection]:
+    """System ranking for a whole archive (Import page): per-entry identification, plus the archive's name."""
+    idents = identify(source, systems, ignore, time_budget=time_budget)
+    total = len(idents)
+    counts = Counter(i.system for i in idents if i.system)
+    hows: dict[str, Counter] = defaultdict(Counter)
+    for i in idents:
+        if i.system:
+            hows[i.system][i.how] += 1
+    out = [Detection(k, n, total, hows[k].most_common(1)[0][0]) for k, n in counts.most_common()]
+    hint = name_hint(Path(source).name, systems)
+    if hint:
+        found = next((d for d in out if d.system == hint), None)
+        if found:
+            out.remove(found)
+            found.why += "; archive name"
+            out.insert(0, found)
+        elif not out:
+            out.insert(0, Detection(hint, 0, total, "archive name only"))
+    return out
+
+
 def summarize(idents: list[Ident]) -> tuple[dict[str, list[Ident]], dict[tuple, list[Ident]], list[Ident]]:
     """(decided by system, ambiguous grouped by candidates, unknown)."""
     decided: dict[str, list[Ident]] = defaultdict(list)

@@ -202,6 +202,28 @@ def test_upload_left_in_place_when_a_job_fails(state, roms):
     assert queue_upload_cleanup(state, other, [failed]) is None
 
 
+def test_import_detects_system_inside_7z_entries(client, roms, tmp_path):
+    from tests.conftest import sevenz_bytes
+
+    members = {f"Game {i} (USA).7z": sevenz_bytes({f"Game {i} (USA).32x": b"\0" * 512}, tmp_path) for i in range(8)}
+    src = make_zip(roms / "_manager" / "uploads" / "nointro.32x.zip", members)
+    r = client.post("/import/inspect", data={"path": str(src)})
+    assert 'value="sega32x" selected' in r.text, r.text[r.text.find("Detected"):][:300]
+    assert "8 of 8 entries" in r.text and "neogeo" not in r.text[r.text.find("Detected"):r.text.find("please confirm")]
+
+
+def test_name_hint():
+    from app.config import DATA_DIR
+    from app.identify import name_hint
+    from app.systems import load_systems
+
+    systems = load_systems(DATA_DIR / "systems.yaml")
+    assert name_hint("nointro.32x.zip", systems) == "sega32x"
+    assert name_hint("Sega Genesis Collection.7z", systems) == "megadrive"
+    assert name_hint("Game Boy Advance set.zip", systems) == "gba"
+    assert name_hint("random stuff.zip", systems) is None
+
+
 def test_identify_folder_source(state, tmp_path):
     inbox = tmp_path / "downloads"
     inbox.mkdir()

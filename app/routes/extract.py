@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from .. import archives, fsutil
 from ..extract import import_targets, plan as make_plan, queue_upload_cleanup
 from ..hooks import lynx
-from ..systems import detect_system
+from ..identify import Detection, rank_systems
 from . import redirect, render, st
 
 router = APIRouter()
@@ -65,12 +65,12 @@ def inspect(request: Request, path: str = Form(...), system: str = Form("")):
     if not ready.ok:
         return render(request, "partials/flash.html", kind="error", message=f"{p.name} is not ready: {ready.reason}")
     info = archives.inspect(p)
-    entries = [e.name for e in archives.list_entries(p)]
-    ranking = detect_system(entries + info.inner_sample_names, s.systems)
+    ranking = rank_systems(p, s.systems, {e.lower() for e in s.cfg.ignore_extensions})
     m = re.match(r"^(.+?)-roms\.(zip|7z)$", p.name, re.I)
     if m and m.group(1) in s.systems:
-        ranking.insert(0, (m.group(1), 10**9))
-    chosen = system or (ranking[0][0] if ranking else "")
+        ranking = [d for d in ranking if d.system != m.group(1)]
+        ranking.insert(0, Detection(m.group(1), 0, 0, f"stored as {p.name}"))
+    chosen = system or (ranking[0].system if ranking else "")
     in_source = fsutil.is_within(p, s.cfg.source_dir)
     return render(request, "partials/inspect.html", info=info, ranking=ranking[:5], chosen=chosen,
                   path=str(p), in_source=in_source, systems=s.systems)

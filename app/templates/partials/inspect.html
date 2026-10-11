@@ -22,8 +22,10 @@
           {% for key, sd in systems.items() %}<option value="{{ key }}" {{ 'selected' if key == chosen }}>{{ key }} — {{ sd.name }}</option>{% endfor %}
         </select>
         <div class="small muted" style="margin-top:.2rem">
-          {% if ranking %}Detected: {% for k, score in ranking %}<b>{{ k }}</b>{{ ", " if not loop.last }}{% endfor %} — please confirm.
-          {% else %}Could not detect the system from file extensions; choose it.{% endif %}</div>
+          {% if ranking %}Detected:
+            {% for d in ranking %}<b>{{ d.system }}</b>{% if d.total %} ({{ d.count }} of {{ d.total }} entries{% endif %}{% if d.why %}{{ ': ' if d.total else ' (' }}{{ d.why }}){% elif d.total %}){% endif %}{{ "; " if not loop.last }}{% endfor %}
+            — please confirm.
+          {% else %}Could not detect the system; choose it (or use the Identify page for mixed archives).{% endif %}</div>
       </div>
       <div><label>Store in <code>_source</code> as <code>&lt;system&gt;-roms{{ '.zip' if path.endswith('.zip') else '.7z' }}</code></label>
         <select name="import_mode">
