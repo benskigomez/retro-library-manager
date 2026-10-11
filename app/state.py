@@ -47,6 +47,12 @@ class State:
         fsutil.configure_ownership(c.ownership.apply, c.ownership.uid, c.ownership.gid)
         archives.configure_tools(c.tools.sevenzip, c.tools.unzip, c.tools.zip_backend)
 
+    def content_index(self, system: str):
+        """CRC32/size index of a system folder, for duplicate-content checks in dry runs."""
+        from .dedupe import ContentIndex
+
+        return ContentIndex(self.db, self.cfg.system_dir(system))
+
     def browse_roots(self) -> list[Path]:
         roots = [self.cfg.roms] + [Path(p) for p in self.cfg.paths.browse_roots]
         return [r for r in roots if str(r)]

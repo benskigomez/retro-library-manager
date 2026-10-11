@@ -82,7 +82,7 @@ def plan_view(request: Request, path: str = Form(...), system: str = Form(...),
     s = st(request)
     p = _checked_archive(s, path)
     sysdef = s.system(system)
-    plan = make_plan(s.cfg, sysdef, p)
+    plan = make_plan(s.cfg, sysdef, p, content=s.content_index(system))
     rows = [r for r in plan.rows if not show or r.decision == show]
     main, extra = import_targets(s.cfg, system, p)
     target_source = extra if main.exists() else main
@@ -96,7 +96,7 @@ def plan_view(request: Request, path: str = Form(...), system: str = Form(...),
 def plan_csv(request: Request, path: str, system: str):
     s = st(request)
     p = _checked_archive(s, path)
-    plan = make_plan(s.cfg, s.system(system), p)
+    plan = make_plan(s.cfg, s.system(system), p, content=s.content_index(system))
     fname = f"plan-{system}-{p.stem}.csv"
     return Response(plan.csv(), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="{fname}"'})

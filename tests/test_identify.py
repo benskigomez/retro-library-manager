@@ -46,7 +46,7 @@ def mixed_members():
         "readme.txt": b"hi",
     }
     for i in range(7):
-        m[f"SNES/Game {i} (USA).zip"] = zip_bytes({f"Game {i} (USA).sfc": b"\0" * 1024})
+        m[f"SNES/Game {i} (USA).zip"] = zip_bytes({f"Game {i} (USA).sfc": bytes([i]) * 1024})
     return m
 
 

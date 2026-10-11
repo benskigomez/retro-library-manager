@@ -80,7 +80,7 @@ def view(request: Request, path: str, system: str = "", q: str = "", show: str =
         system = ranking[0][0] if ranking else ""
     sysdef = s.systems.get(system)
     if sysdef:
-        rows = make_plan(s.cfg, sysdef, p, entries).rows
+        rows = make_plan(s.cfg, sysdef, p, entries, content=s.content_index(system)).rows
     else:
         rows = []
     totals = Counter(r.decision for r in rows)
@@ -120,7 +120,7 @@ def preview(request: Request, path: str = Form(...), system: str = Form(...), mo
                       names=[], rows=[], totals=Counter(g.status for g in games))
     if not names:
         return render(request, "partials/flash.html", kind="warn", message="Select at least one entry.")
-    rows = make_plan(s.cfg, sysdef, p, select=set(names)).rows
+    rows = make_plan(s.cfg, sysdef, p, select=set(names), content=s.content_index(system)).rows
     return render(request, "partials/source_preview.html", mode=mode, rows=rows, path=str(p), system=system,
                   names=names, games=[], totals=Counter(r.decision for r in rows), sysdef=sysdef)
 

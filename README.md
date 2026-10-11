@@ -101,6 +101,17 @@ You choose a system for anything still ambiguous (e.g. small headerless `.bin` f
 
 Every system page has a **search box** for its files.
 
+**Duplicates are caught by content, not just by name.** A game counts as already in the library when a file with the same name stem exists, *or* when any file in the system folder has exactly the same content (CRC32 + size), whatever it is called. That catches `Sonic the Hedgehog (U) [!].bin` vs `Sonic the Hedgehog (USA, Europe).md`. When this happens:
+- the dry run shows `present — same ROM already in library as …`;
+- the same content appearing twice in one archive is added only once;
+- disc sets count as present when all of their tracks are already there.
+
+Where the checks happen:
+- loose ROMs, single-file disc images and arcade sets are checked in the dry run, using CRCs the archive already stores;
+- per-game zips inside a set are checked during the run.
+
+Library files are hashed only when their size matches an incoming file, and the result is cached. Limit: a game already converted to CHD is a different file from its `.cue/.bin`, so it is matched by name only. A different revision or dump is a different ROM and is not treated as a duplicate.
+
 **Uploads tidy themselves up.** Files uploaded from the browser (Import or Identify) land in `_manager/uploads/`. Once every job that used an upload has finished successfully, a final job moves it to the Trash, where it stays restorable until you purge it. If any of those jobs failed or was cancelled, the upload is left in place so you can retry. Archives picked from elsewhere on the share are never touched.
 
 Disc systems: put per-game archives in a folder, then go to **Disc → CHD** → pick the folder and system → **Dry run** → **Convert selected**.

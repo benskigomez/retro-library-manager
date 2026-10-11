@@ -144,7 +144,7 @@ def bundle_preview(request: Request, path: str = Form(...), system: str = Form("
     p = s.check_browsable(path.strip())
     if not p.is_file() or p.suffix.lower() not in archives.ARCHIVE_EXTS:
         raise HTTPException(400, "pick a .zip or .7z bundle")
-    plan = extract.plan(s.cfg, s.system(system), p)
+    plan = extract.plan(s.cfg, s.system(system), p, content=s.content_index(system))
     return render(request, "partials/bundle_preview.html", plan=plan, path=str(p), system=system)
 
 

@@ -35,8 +35,8 @@ def test_flat_archive(state, roms):
 
 def test_subfolder_entries_extract_flat_and_bios_staged(state, roms):
     src = make_zip(roms / "_source" / "gb-roms.zip", {
-        "GB/Tetris (World).gb": ROM,
-        "GB/Deep/Pokemon - Yellow Version (USA, Europe) (CGB+SGB Enhanced).gb": ROM,
+        "GB/Tetris (World).gb": b"tetris" * 100,
+        "GB/Deep/Pokemon - Yellow Version (USA, Europe) (CGB+SGB Enhanced).gb": b"pokemon" * 100,
         "GB/[BIOS] Nintendo Game Boy Boot ROM (World) (Rev 1).gb": b"boot",
     })
     job = submit(state, src, "gb")
@@ -229,7 +229,8 @@ def test_escape_unzip_pattern():
 def test_arcade_sets_copied_as_is(state, roms):
     inner = zip_bytes({"rom1.bin": b"1", "rom2.bin": b"2"})
     src = make_zip(roms / "_source" / "mame-roms.zip", {
-        "mame/spyhunt.zip": inner, "mame/midssio.zip": inner, "mame/readme.txt": b"x", "mame/odd.dat": b"x"})
+        "mame/spyhunt.zip": inner, "mame/midssio.zip": zip_bytes({"ssio.snd": b"3"}),
+        "mame/readme.txt": b"x", "mame/odd.dat": b"x"})
     job = submit(state, src, "mame")
     assert job["status"] == "done"
     assert sorted(p.name for p in (roms / "mame").iterdir()) == ["midssio.zip", "spyhunt.zip"]
@@ -286,7 +287,7 @@ def test_import_copy_into_source(state, roms):
     assert (roms / "_source" / "gb-roms.zip").exists() and src.exists()
     # a second, different archive for the same system goes to _source/<system>/<its name>;
     # the existing gb-roms.zip is never modified
-    other = make_zip(roms / "incoming" / "other.zip", {"Other (USA).gb": ROM})
+    other = make_zip(roms / "incoming" / "other.zip", {"Other (USA).gb": b"other" * 100})
     job = submit(state, other, "gb", import_mode="copy")
     assert job["status"] == "done", job
     assert (roms / "_source" / "gb" / "other.zip").read_bytes() == other.read_bytes()

@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import archives, chd, fsutil
+from .dedupe import ContentIndex, crc32_file
 from .config import Config
 from .filters import BIOS, EXCLUDE, INCLUDE, Decision, RuleSet
 from .hooks import HOOKS
@@ -122,13 +123,17 @@ def disc_groups(source: Path, entries: list[archives.Entry]) -> tuple[dict, dict
 
 
 def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entry] | None = None,
-         select: set[str] | None = None, override: bool = True) -> Plan:
+         select: set[str] | None = None, override: bool = True, content: ContentIndex | None = None) -> Plan:
     """Decide every entry without writing anything.
 
     ``select`` limits the plan to those entries. With ``override`` (the default)
     the operator's choice also overrides the region/quality filter; never
     "present" (no overwrites) or BIOS staging. For disc systems a .cue/.gdi and
     its tracks are planned as one unit: selecting either brings the whole set.
+
+    With ``content`` (a ContentIndex over the system folder) entries whose exact
+    content (CRC32 + size) is already in the library under another name are
+    "present" too, and repeated content inside the archive is skipped.
     """
     archive = Path(archive)
     entries = entries if entries is not None else archives.list_entries(archive)
@@ -158,6 +163,43 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
     accepted = sysdef.rom_extensions - set(ARCHIVE_EXTS)
     seen: set[str] = set()
     p = Plan(str(archive), sysdef.key)
+    by_name = {e.name: e for e in entries}
+    content_seen: dict[tuple[int, int], str] = {}
+
+    def entry_crc(e: archives.Entry) -> int | None:
+        if e.crc is not None:
+            return e.crc & 0xFFFFFFFF
+        if archive.is_dir() and content is not None and content.has_size(e.size):
+            return crc32_file(archive / e.name)  # folder sources have no stored CRCs
+        return None
+
+    def same_content(e: archives.Entry) -> tuple[str, str] | None:
+        if content is None or e.size == 0:
+            return None
+        crc = entry_crc(e)
+        if crc is None:
+            return None
+        hit = content.find(crc, e.size)
+        if hit:
+            return PRESENT, f"same ROM already in library as {hit} (CRC32 match)"
+        key = (crc, e.size)
+        if key in content_seen:
+            return SKIPPED, f"same content as {content_seen[key]} in this archive"
+        content_seen[key] = e.base
+        return None
+
+    def set_in_library(members: list[str]) -> str | None:
+        """Every track of a disc set already in the library (under any names)?"""
+        if content is None or not members:
+            return None
+        hits = []
+        for m in members:
+            e = by_name.get(m)
+            hit = content.find(entry_crc(e), e.size) if e and e.size else None
+            if not hit:
+                return None
+            hits.append(hit)
+        return hits[0]
 
     for e in entries:
         if e.is_dir:
@@ -194,6 +236,8 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
                 p.rows.append(Row(e.name, base, SET, PRESENT, "set already in folder", base))
             elif key in seen:
                 p.rows.append(Row(e.name, base, SET, SKIPPED, "duplicate name in archive"))
+            elif dup := same_content(e):
+                p.rows.append(Row(e.name, base, SET, dup[0], dup[1]))
             else:
                 seen.add(key)
                 p.rows.append(Row(e.name, base, SET, INCLUDE, d.rule, base))
@@ -207,7 +251,8 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
                                   "CloneCD/MDS/NRG layout: chdman needs .cue/.bin, convert it first"))
                 continue
             if e.name in groups:
-                p.rows.extend(_plan_disc_set(e, groups[e.name], manual(rules.decide(e.name)), stems, names, seen))
+                p.rows.extend(_plan_disc_set(e, groups[e.name], manual(rules.decide(e.name)), stems, names, seen,
+                                             set_in_library(groups[e.name][0])))
                 continue
 
         kind = INNER if ext in ARCHIVE_EXTS else ROM
@@ -230,6 +275,8 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
             p.rows.append(Row(e.name, base, kind, PRESENT, f"{stem}.* already exists"))
         elif dup_key in seen:
             p.rows.append(Row(e.name, base, kind, SKIPPED, "duplicate name in archive"))
+        elif kind != INNER and (dup := same_content(e)):
+            p.rows.append(Row(e.name, base, kind, dup[0], dup[1]))
         else:
             seen.add(dup_key)
             p.rows.append(Row(e.name, base, kind, INCLUDE, d.rule, target))
@@ -237,7 +284,7 @@ def plan(cfg: Config, sysdef: System, archive: Path, entries: list[archives.Entr
 
 
 def _plan_disc_set(e: archives.Entry, group, d: Decision, stems: set[str], names: set[str],
-                   seen: set[str]) -> list[Row]:
+                   seen: set[str], content_hit: str | None = None) -> list[Row]:
     members, missing = group
     base, stem = e.base, e.stem
     n = len(members)
@@ -253,6 +300,9 @@ def _plan_disc_set(e: archives.Entry, group, d: Decision, stems: set[str], names
         row = Row(e.name, base, DISC, PRESENT, f"{stem}.* already exists", members=members)
     elif any(m.rsplit("/", 1)[-1].casefold() in names for m in members):
         row = Row(e.name, base, DISC, SKIPPED, "some of its tracks are already in the folder; not mixing sets",
+                  members=members)
+    elif content_hit:
+        row = Row(e.name, base, DISC, PRESENT, f"same tracks already in library (e.g. {content_hit}; CRC32 match)",
                   members=members)
     elif base.casefold() in seen:
         row = Row(e.name, base, DISC, SKIPPED, "duplicate name in archive", members=members)
@@ -318,7 +368,8 @@ def _copy_files_all_or_nothing(ctx, files: list[tuple[Path, str]], folder: Path,
     return True
 
 
-def _unpack_inner_disc(ctx, sysdef: System, work: Path, folder: Path, row: Row) -> None:
+def _unpack_inner_disc(ctx, sysdef: System, work: Path, folder: Path, row: Row,
+                       content: ContentIndex | None = None) -> None:
     """A per-game disc archive: copy each .cue/.gdi with all of its tracks, or nothing."""
     names = [str(Path(r) / f) for r, _d, fs in os.walk(work) for f in fs]
     descs, problem = chd.pick_descriptors(names)
@@ -338,6 +389,11 @@ def _unpack_inner_disc(ctx, sysdef: System, work: Path, folder: Path, row: Row) 
             ctx.item(desc.name, "failed", f"from {row.base}: tracks are in sub-folders; convert to CHD instead")
             continue
         files = [(desc, desc.name)] + [(t, t.name) for t in tracks]
+        hit = _tracks_in_library(content, tracks)
+        if hit:
+            ctx.count("present")
+            ctx.item(desc.name, "present", f"from {row.base}: same tracks already in library (e.g. {hit})")
+            continue
         if _copy_files_all_or_nothing(ctx, files, folder, desc.name):
             existing_stems_cache(ctx, folder).add(desc.stem.casefold())
             ctx.count("added")
@@ -345,12 +401,26 @@ def _unpack_inner_disc(ctx, sysdef: System, work: Path, folder: Path, row: Row) 
             ctx.log(f"ADD  {desc.name} + {len(tracks)} track(s)  (from {row.base})")
 
 
-def _unpack_inner(ctx, cfg: Config, sysdef: System, inner_archive: Path, folder: Path, row: Row) -> None:
+def _tracks_in_library(content: ContentIndex | None, tracks: list[Path]) -> str | None:
+    if content is None or not tracks:
+        return None
+    hits = []
+    for tr in tracks:
+        size = tr.stat().st_size
+        hit = content.find(crc32_file(tr), size) if size and content.has_size(size) else None
+        if not hit:
+            return None
+        hits.append(hit)
+    return hits[0]
+
+
+def _unpack_inner(ctx, cfg: Config, sysdef: System, inner_archive: Path, folder: Path, row: Row,
+                  content: ContentIndex | None = None) -> None:
     """Unpack one per-game inner archive's ROM files flat into the system folder."""
     work = inner_archive.parent / "x"
     archives.extract_all(inner_archive, work)
     if sysdef.disc and any(Path(f).suffix.lower() in chd.DISC_EXTS for _r, _d, fs in os.walk(work) for f in fs):
-        _unpack_inner_disc(ctx, sysdef, work, folder, row)
+        _unpack_inner_disc(ctx, sysdef, work, folder, row, content)
         return
     ignore = {e.lower() for e in cfg.ignore_extensions}
     accepted = sysdef.rom_extensions - set(ARCHIVE_EXTS)
@@ -376,7 +446,17 @@ def _unpack_inner(ctx, cfg: Config, sysdef: System, inner_archive: Path, folder:
             ctx.count("present")
             ctx.item(src.name, "present", f"from {row.base}: already exists")
             continue
+        size = src.stat().st_size
+        crc = crc32_file(src) if content is not None and size else None
+        hit = content.find(crc, size) if crc is not None else None
+        if hit:
+            ctx.count("present")
+            ctx.item(src.name, "present", f"from {row.base}: same ROM already in library as {hit} (CRC32 match)")
+            ctx.log(f"SAME {src.name} = {hit}")
+            continue
         fsutil.copy_new(src, dest, ctx.check)
+        if content is not None:
+            content.add(src.name, crc, size)
         existing_stems_cache(ctx, folder).add(Path(src.name).stem.casefold())
         ctx.count("added")
         ctx.item(src.name, "added", f"from {row.base}")
@@ -406,6 +486,22 @@ def _stage_inner_bios(ctx, cfg: Config, sysdef: System, inner_archive: Path, bio
     if not found:
         ctx.count("skipped")
         ctx.item(row.base, "skipped", "archive contains no files")
+
+
+def _inner_disc_in_library(content: ContentIndex, inner: Path) -> str | None:
+    """Are the track files inside a per-game disc archive already in the library? (from its CRC list)"""
+    try:
+        files = [e for e in archives.list_entries(inner)
+                 if not e.is_dir and e.ext in chd.DISC_EXTS and e.ext not in (".cue", ".gdi", ".toc", ".ccd")]
+    except Exception:  # noqa: BLE001
+        return None
+    hits = []
+    for e in files:
+        hit = content.find(e.crc, e.size) if e.crc is not None and e.size else None
+        if not hit:
+            return None
+        hits.append(hit)
+    return hits[0] if hits else None
 
 
 def _add_disc_set(ctx, cfg: Config, sysdef: System, ex: "Extractor", row: Row, folder: Path,
@@ -473,7 +569,12 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
     ctx.log(f"{archive} is stable; planning against {cfg.system_dir(sysdef.key)}")
     if sysdef.disc:
         ctx.log("Disc games: " + ("convert to CHD" if convert else "copy original files"))
-    p = plan(cfg, sysdef, archive, select=set(select) if select else None, override=override)
+    queue = getattr(ctx, "queue", None)
+    content = ContentIndex(getattr(queue, "db", None), cfg.system_dir(sysdef.key))
+    entries = archives.list_entries(archive)
+    crcs = {e.name: e.crc for e in entries}
+    p = plan(cfg, sysdef, archive, entries, select=set(select) if select else None, override=override,
+             content=content)
     totals = p.totals
     ctx.log("Plan: " + ", ".join(f"{k} {v}" for k, v in sorted(totals.items())))
     ctx.count("matched", totals.get(INCLUDE, 0))
@@ -510,6 +611,7 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
                     _add_disc_set(ctx, cfg, sysdef, ex, r, folder, tmp_root, convert)
                 elif r.kind in (ROM, SET):
                     ex.write_member(r.entry, folder / r.base, ctx.check)
+                    content.add(r.base, crcs.get(r.entry), (folder / r.base).stat().st_size)
                     existing_stems_cache(ctx, folder).add(Path(r.base).stem.casefold())
                     ctx.count("added")
                     ctx.item(r.base, "added", r.rule)
@@ -522,10 +624,15 @@ def execute(ctx, cfg: Config, sysdef: System, archive: Path, select: list[str] |
                     inner = ex.member_to_temp(r.entry, ctx.check)
                     try:
                         if convert:
+                            hit = _inner_disc_in_library(content, inner)
+                            if hit:
+                                ctx.count("present")
+                                ctx.item(r.base, "present", f"same tracks already in library (e.g. {hit}; CRC32 match)")
+                                continue
                             game = chd.Game(Path(r.base).stem, "archive", inner)
                             chd.convert_game(ctx, cfg, sysdef, game, backup=False)  # the source zip is the backup
                         else:
-                            _unpack_inner(ctx, cfg, sysdef, inner, folder, r)
+                            _unpack_inner(ctx, cfg, sysdef, inner, folder, r, content)
                     finally:
                         shutil.rmtree(inner.parent, ignore_errors=True)
             except FileExistsError as e:

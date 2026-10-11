@@ -104,7 +104,7 @@ async def plan_view(request: Request):
     plans = []
     for system, entries in sorted(groups.items()):
         sysdef = s.system(system)
-        pl = make_plan(s.cfg, sysdef, p, select=set(entries), override=False)
+        pl = make_plan(s.cfg, sysdef, p, select=set(entries), override=False, content=s.content_index(system))
         plans.append({"system": system, "sysdef": sysdef, "plan": pl, "totals": pl.totals})
     return render(request, "partials/identify_plan.html", path=str(p), plans=plans,
                   groups=json.dumps(groups), keep=bool(form.get("keep")))
