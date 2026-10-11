@@ -76,8 +76,10 @@ def scan(request: Request, path: str = Form(...)):
                    "how": Counter(i.how for i in items).most_common(1)[0][0]}
                   for c, items in ambiguous.items()]
     can_keep = p.is_file() and not fsutil.is_within(p, s.cfg.source_dir)
+    single_system = next(iter(decided)) if len(decided) == 1 and not amb_groups else None
     return render(request, "partials/identify_result.html", path=str(p), decided=decided, amb_groups=amb_groups,
-                  unknown=unknown, assigned=json.dumps(assigned), systems=s.systems, can_keep=can_keep)
+                  unknown=unknown, assigned=json.dumps(assigned), systems=s.systems, can_keep=can_keep,
+                  single_system=single_system)
 
 
 def _assignments(form) -> dict[str, list[str]]:
@@ -114,8 +116,12 @@ async def run(request: Request):
     form = await request.form()
     p = _source(s, form["path"])
     assignment: dict[str, list[str]] = json.loads(form["groups"])
+    used = [system for system in assignment if form.get(f"use_{system}")]
     if form.get("keep") and p.is_file():
-        s.queue.submit("source_keep", f"Keep a copy of {p.name} in _source", {"archive": str(p)})
+        # Everything for one system: keep it with that system's per-game sources.
+        keep_system = used[0] if len(used) == 1 else None
+        where = f"_source/{keep_system}/" if keep_system else "_source/"
+        s.queue.submit("source_keep", f"Keep a copy of {p.name} in {where}", {"archive": str(p), "system": keep_system})
     for system, entries in sorted(assignment.items()):
         if not form.get(f"use_{system}"):
             continue

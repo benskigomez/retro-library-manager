@@ -158,6 +158,28 @@ def test_identify_flow_end_to_end(client, roms):
     assert src.exists()  # original left in place
 
 
+def test_single_system_archive_is_kept_with_that_system(client, roms):
+    state = client.app.state.rlm
+    src = make_zip(roms / "_manager" / "uploads" / "Exile (USA).zip", {
+        "Exile (USA).cue": b'FILE "Exile (USA) (Track 1).bin" BINARY\n  TRACK 01 AUDIO\n',
+        "Exile (USA) (Track 1).bin": b"\0" * 2352})
+    r = client.post("/identify/scan", data={"path": str(src)})
+    form = {"path": str(src), "keep": "1",
+            "assigned": json.dumps({"Exile (USA).cue": "pcenginecd"})}
+    r = client.post("/identify/plan", data=form)
+    groups = re.search(r'name="groups" value="([^"]*)"', r.text).group(1).replace("&#34;", '"').replace("&quot;", '"')
+    client.post("/identify/run", data={"path": str(src), "groups": groups, "keep": "1",
+                                       "use_pcenginecd": "1", "mode_pcenginecd": "original"})
+    for _ in range(200):
+        if all(j["status"] in ("done", "failed") for j in state.queue.recent(10)):
+            break
+        time.sleep(0.05)
+    keep = next(j for j in state.queue.recent(10) if j["kind"] == "source_keep")
+    assert keep["status"] == "done", keep
+    assert (roms / "_source" / "pcenginecd" / "Exile (USA).zip").read_bytes() == src.read_bytes()
+    assert not (roms / "_source" / "Exile (USA).zip").exists()
+
+
 def test_identify_folder_source(state, tmp_path):
     inbox = tmp_path / "downloads"
     inbox.mkdir()

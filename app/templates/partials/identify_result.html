@@ -42,7 +42,9 @@
 
   {% if can_keep %}
   <p><label style="font-weight:normal"><input type="checkbox" name="keep" value="1" checked>
-    Keep a copy of this archive in <code>_source/</code> under its own name (it doesn't belong to one system)</label></p>
+    Keep a copy of this archive in
+    {% if single_system %}<code>_source/{{ single_system }}/</code> with that system's other sources
+    {%- else %}<code>_source/</code> under its own name — or in <code>_source/&lt;system&gt;/</code> if you end up running only one system{% endif %}</label></p>
   {% endif %}
   <p><button type="submit">Dry run per system</button></p>
 </form>

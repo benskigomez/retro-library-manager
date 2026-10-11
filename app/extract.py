@@ -618,22 +618,29 @@ def import_archive(ctx, cfg: Config, system: str, archive: Path, mode: str) -> P
 
 
 def keep_in_source(state, ctx) -> dict:
-    """Copy an archive into _source under its own name (copy, verify; never overwrite)."""
+    """Copy an archive into _source under its own name (copy, verify; never overwrite).
+
+    With ``system`` it goes to _source/<system>/, next to that system's per-game sources.
+    """
     cfg = state.cfg
     src = Path(ctx.params["archive"])
-    dest = cfg.source_dir / src.name
+    system = ctx.params.get("system")
+    if system:
+        state.system(system)  # must be a defined system folder name
+    dest = (cfg.source_dir / system / src.name) if system else (cfg.source_dir / src.name)
+    rel = dest.relative_to(cfg.source_dir).as_posix()
     if dest.exists():
         if dest.stat().st_size == src.stat().st_size and fsutil.md5_file(dest) == fsutil.md5_file(src):
-            ctx.log(f"_source/{dest.name} already exists with identical content")
+            ctx.log(f"_source/{rel} already exists with identical content")
             return {}
-        raise RuntimeError(f"_source/{dest.name} already exists with different content; not overwriting")
+        raise RuntimeError(f"_source/{rel} already exists with different content; not overwriting")
     ready = fsutil.wait_stable(src, cfg.stability.wait_seconds)
     if not ready.ok:
         raise RuntimeError(f"{src.name} is not ready: {ready.reason}")
-    fsutil.ensure_dir(cfg.source_dir)
+    fsutil.ensure_dir(dest.parent)
     fsutil.copy_verify(src, dest, ctx.check)
     ctx.count("kept")
-    ctx.log(f"Copied {src} -> _source/{dest.name} (MD5 verified)")
+    ctx.log(f"Copied {src} -> _source/{rel} (MD5 verified)")
     return {}
 
 
