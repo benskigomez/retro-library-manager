@@ -33,4 +33,9 @@ def test_all_pages_render(client, roms, tmp_path):
         r = client.get(url)
         assert r.status_code == 200, (url, r.status_code, r.text[:500])
     assert "Tetris" in client.get("/system/gb").text
+    # static assets carry a content version so browsers never run a stale app.js after an update
+    import re
+
+    v = re.search(r'/static/app\.js\?v=([0-9a-f]{10})', client.get("/identify").text)
+    assert v and client.get(f"/static/app.js?v={v.group(1)}").status_code == 200
     assert "1 BIOS staged" in client.get("/").text

@@ -31,8 +31,21 @@ def human_size(n: int | float | None) -> str:
     return f"{n:.1f} TB"
 
 
+def static_version() -> str:
+    """Content hash of the static files: appended to their URLs so an update is never served from a stale cache."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for p in sorted((HERE / "static").rglob("*")):
+        if p.is_file():
+            h.update(p.name.encode())
+            h.update(p.read_bytes())
+    return h.hexdigest()[:10]
+
+
 def make_templates() -> Jinja2Templates:
     t = Jinja2Templates(directory=str(HERE / "templates"))
+    t.env.globals["asset_v"] = static_version()
     t.env.filters["size"] = human_size
     t.env.globals["version"] = __version__
     t.env.globals["now"] = datetime.now
