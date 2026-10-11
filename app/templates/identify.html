@@ -6,7 +6,7 @@
   then get a normal filtered dry run per system. Nothing is written until you run it, originals are left where they are, and existing games
   are never overwritten.</p>
 <div class="panel">
-  <form class="stack" style="max-width:none" hx-post="/identify/scan" hx-target="#ident" hx-indicator="#ident-spin">
+  <form id="ident-form" class="stack" style="max-width:none" hx-post="/identify/scan" hx-target="#ident" hx-indicator="#ident-spin">
     <div class="row">
       <div><label for="ident-path">Archive or folder</label>
         <input type="text" id="ident-path" name="path" value="{{ path }}" required placeholder="{{ state.cfg.paths.roms }}/_incoming/mixed.zip"></div>
@@ -18,6 +18,21 @@
     <div id="ident-picker"></div>
     <div><button type="submit">Identify</button> <span id="ident-spin" class="htmx-indicator muted small">checking the files are complete, then reading headers…</span></div>
   </form>
+  <h3>…or upload from this device</h3>
+  <div class="row">
+    <div><label>An archive (.zip / .7z)</label><input type="file" id="up-archive" accept=".zip,.7z"></div>
+    <div class="shrink"><button type="button" class="secondary"
+      onclick="rlmUploadAndScan('archive', 'up-archive', 'ident-path', 'ident-form', 'up-bar', 'up-msg')">Upload and identify</button></div>
+  </div>
+  <div class="row" style="margin-top:.5rem">
+    <div><label>A whole folder (desktop browsers)</label><input type="file" id="up-folder" webkitdirectory directory multiple></div>
+    <div class="shrink"><button type="button" class="secondary"
+      onclick="rlmUploadAndScan('folder', 'up-folder', 'ident-path', 'ident-form', 'up-bar', 'up-msg')">Upload and identify</button></div>
+  </div>
+  <progress id="up-bar" value="0" max="100" style="width:100%;display:none;margin-top:.5rem"></progress>
+  <div id="up-msg" class="small"></div>
+  <p class="small muted">Uploads go to <code>_manager/uploads/</code> on Jarvis (a folder keeps its sub-folders). For many gigabytes, copying to
+    <code>\\jarvis\roms</code> over SMB and using Browse is faster. Phones can upload a single archive but usually can't pick a folder.</p>
 </div>
 <div id="ident"></div>
 <div id="ident-plan"></div>

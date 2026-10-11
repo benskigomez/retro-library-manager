@@ -130,6 +130,23 @@ def test_identify_folder_source(state, tmp_path):
     assert idents == {"a.gba": "gba", "Sonic.bin": "megadrive"}
 
 
+def test_folder_upload_then_identify(client, roms):
+    r = client.put("/identify/upload-file", params={"batch": "20261010-ab12", "rel": "My Stuff/gba/a.gba"}, content=b"\0" * 10)
+    assert r.status_code == 200
+    folder = r.json()["path"]
+    r = client.put("/identify/upload-file", params={"batch": "20261010-ab12", "rel": "My Stuff/Sonic.bin"},
+                   content=genesis_rom())
+    assert r.json()["path"] == folder
+    assert (roms / "_manager" / "uploads" / "folder-20261010-ab12" / "My Stuff" / "gba" / "a.gba").exists()
+    for bad in ("../escape.gb", "a/../../x.gb", ".hidden/x.gb", ""):
+        assert client.put("/identify/upload-file", params={"batch": "20261010-ab12", "rel": bad}, content=b"x").status_code == 400
+    assert client.put("/identify/upload-file", params={"batch": "../x", "rel": "a.gb"}, content=b"x").status_code == 400
+    assert client.put("/identify/upload-file", params={"batch": "20261010-ab12", "rel": "My Stuff/Sonic.bin"},
+                      content=b"other").status_code == 409  # never overwrites
+    r = client.post("/identify/scan", data={"path": folder})
+    assert r.status_code == 200 and "gba" in r.text and "megadrive" in r.text
+
+
 def test_system_page_search(client, roms):
     (roms / "snes").mkdir()
     for n in ("Chrono Trigger (USA).sfc", "Super Metroid (USA).sfc", "Terranigma (Europe).sfc"):

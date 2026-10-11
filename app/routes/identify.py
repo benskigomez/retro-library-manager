@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from collections import Counter
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from .. import archives, fsutil
 from ..extract import plan as make_plan
@@ -22,6 +25,35 @@ def _source(s, path: str) -> Path:
     if not p.is_file() or p.suffix.lower() not in archives.ARCHIVE_EXTS:
         raise HTTPException(400, "pick a .zip/.7z archive or a folder")
     return p
+
+
+@router.put("/identify/upload-file")
+async def upload_file(request: Request, batch: str, rel: str):
+    """One file of a folder uploaded from the browser, kept under its relative path."""
+    s = st(request)
+    if not re.fullmatch(r"[0-9A-Za-z-]{1,40}", batch):
+        raise HTTPException(400, "bad batch id")
+    root = fsutil.ensure_dir(s.cfg.manager_dir / "uploads" / f"folder-{batch}")
+    parts = [x for x in rel.replace("\\", "/").split("/") if x not in ("", ".")]
+    if not parts or ".." in parts or any(x.startswith(".") for x in parts):
+        raise HTTPException(400, f"bad relative path: {rel}")
+    dest = root.joinpath(*parts)
+    if not fsutil.is_within(dest, root):
+        raise HTTPException(400, f"bad relative path: {rel}")
+    if dest.exists():
+        raise HTTPException(409, f"{rel} was already uploaded in this batch")
+    fsutil.ensure_dir(dest.parent)
+    part = dest.with_name(f".{dest.name}.part")
+    try:
+        with open(part, "wb") as f:
+            async for chunk in request.stream():
+                f.write(chunk)
+        os.rename(part, dest)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+    fsutil.fix_perms(dest)
+    return JSONResponse({"path": str(root)})
 
 
 @router.get("/identify")
