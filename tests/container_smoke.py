@@ -142,6 +142,22 @@ def t_chdman():
 
 check("chdman createcd/extractcd round trip", t_chdman)
 
+
+def t_chdman_dvd():
+    # PSP/PS2 ISOs need createdvd/extractdvd (chdman >= 0.256)
+    d = work / "dvd"
+    d.mkdir()
+    (d / "g.iso").write_bytes(os.urandom(2048 * 512))
+    subprocess.run(["chdman", "createdvd", "-i", str(d / "g.iso"), "-o", str(d / "g.chd")], check=True,
+                   capture_output=True)
+    subprocess.run(["chdman", "extractdvd", "-i", str(d / "g.chd"), "-o", str(d / "out.iso")], check=True,
+                   capture_output=True)
+    assert (d / "out.iso").read_bytes() == (d / "g.iso").read_bytes()
+
+
+check("chdman createdvd/extractdvd round trip (PSP/PS2)", t_chdman_dvd)
+print("      " + subprocess.run(["chdman"], capture_output=True, text=True).stdout.splitlines()[0])
+
 shutil.rmtree(work, ignore_errors=True)
 print(f"\n{len(failures)} failure(s)" if failures else "\nall container checks passed")
 sys.exit(1 if failures else 0)

@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-trixie
 
 # unzip/zipinfo, 7-Zip (7zz) and chdman (mame-tools; no full MAME binary needed)
 RUN apt-get update \
