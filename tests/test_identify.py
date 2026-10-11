@@ -163,6 +163,7 @@ def test_single_system_archive_is_kept_with_that_system(client, roms):
     src = make_zip(roms / "_manager" / "uploads" / "Exile (USA).zip", {
         "Exile (USA).cue": b'FILE "Exile (USA) (Track 1).bin" BINARY\n  TRACK 01 AUDIO\n',
         "Exile (USA) (Track 1).bin": b"\0" * 2352})
+    original = src.read_bytes()
     r = client.post("/identify/scan", data={"path": str(src)})
     form = {"path": str(src), "keep": "1",
             "assigned": json.dumps({"Exile (USA).cue": "pcenginecd"})}
@@ -176,8 +177,29 @@ def test_single_system_archive_is_kept_with_that_system(client, roms):
         time.sleep(0.05)
     keep = next(j for j in state.queue.recent(10) if j["kind"] == "source_keep")
     assert keep["status"] == "done", keep
-    assert (roms / "_source" / "pcenginecd" / "Exile (USA).zip").read_bytes() == src.read_bytes()
+    assert (roms / "_source" / "pcenginecd" / "Exile (USA).zip").read_bytes() == original
     assert not (roms / "_source" / "Exile (USA).zip").exists()
+    # every job succeeded, so the upload was tidied away into the trash (restorable), not deleted
+    cleanup = next(j for j in state.queue.recent(10) if j["kind"] == "upload_cleanup")
+    assert cleanup["status"] == "done" and cleanup["summary"].get("trashed") == 1
+    assert not src.exists()
+    assert [p.read_bytes() for p in (roms / "_trash").rglob("Exile (USA).zip")] == [original]
+
+
+def test_upload_left_in_place_when_a_job_fails(state, roms):
+    from app.extract import queue_upload_cleanup
+    from tests.conftest import run_job
+
+    up = make_zip(roms / "_manager" / "uploads" / "bad.zip", {"a.gb": b"x"})
+    failed = state.queue.submit("extract", "t", {"archive": str(up), "system": "nope", "import_mode": "none"})
+    run_job(state, failed)
+    assert state.queue.get(failed)["status"] == "failed"
+    job = run_job(state, queue_upload_cleanup(state, up, [failed]))
+    assert job["status"] == "done" and "left_in_place" in job["summary"]
+    assert up.exists()
+    # paths outside _manager/uploads are never cleaned up
+    other = make_zip(roms / "incoming" / "x.zip", {"a.gb": b"x"})
+    assert queue_upload_cleanup(state, other, [failed]) is None
 
 
 def test_identify_folder_source(state, tmp_path):

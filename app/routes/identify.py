@@ -11,7 +11,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .. import archives, fsutil
-from ..extract import plan as make_plan
+from ..extract import plan as make_plan, queue_upload_cleanup
 from ..identify import identify, summarize
 from . import redirect, render, st
 
@@ -117,11 +117,13 @@ async def run(request: Request):
     p = _source(s, form["path"])
     assignment: dict[str, list[str]] = json.loads(form["groups"])
     used = [system for system in assignment if form.get(f"use_{system}")]
+    job_ids: list[int] = []
     if form.get("keep") and p.is_file():
         # Everything for one system: keep it with that system's per-game sources.
         keep_system = used[0] if len(used) == 1 else None
         where = f"_source/{keep_system}/" if keep_system else "_source/"
-        s.queue.submit("source_keep", f"Keep a copy of {p.name} in {where}", {"archive": str(p), "system": keep_system})
+        job_ids.append(s.queue.submit("source_keep", f"Keep a copy of {p.name} in {where}",
+                                      {"archive": str(p), "system": keep_system}))
     for system, entries in sorted(assignment.items()):
         if not form.get(f"use_{system}"):
             continue
@@ -129,7 +131,9 @@ async def run(request: Request):
         mode = form.get(f"mode_{system}")
         convert = (mode == "chd") if (sysdef.disc and mode in ("chd", "original")) else None
         n = len(entries)
-        s.queue.submit("extract", f"Identify: {n} {'item' if n == 1 else 'items'} from {p.name} → {system}",
-                       {"archive": str(p), "system": system, "import_mode": "none", "select": entries,
-                        "override": False, "convert": convert}, system=system)
+        job_ids.append(s.queue.submit(
+            "extract", f"Identify: {n} {'item' if n == 1 else 'items'} from {p.name} → {system}",
+            {"archive": str(p), "system": system, "import_mode": "none", "select": entries,
+             "override": False, "convert": convert}, system=system))
+    queue_upload_cleanup(s, p, job_ids)
     return redirect(request, "/jobs")

@@ -644,6 +644,58 @@ def keep_in_source(state, ctx) -> dict:
     return {}
 
 
+def uploads_dir(cfg: Config) -> Path:
+    return cfg.manager_dir / "uploads"
+
+
+def queue_upload_cleanup(state, path: Path, job_ids: list[int]) -> int | None:
+    """After an import from _manager/uploads, tidy the upload once those jobs have succeeded."""
+    path = Path(path)
+    if not job_ids or not fsutil.is_within(path, uploads_dir(state.cfg)) or \
+            path.resolve() == uploads_dir(state.cfg).resolve():
+        return None
+    return state.queue.submit("upload_cleanup", f"Clean up upload {path.name}", {"path": str(path), "after": job_ids})
+
+
+def cleanup_upload(state, ctx) -> dict:
+    """Move an upload to the trash once every job that used it finished successfully.
+
+    The upload may be the only copy of an archive (no "keep a copy", or a folder upload),
+    so it goes to _trash/ (restorable) rather than being deleted, and it is left in place
+    entirely if any of those jobs failed or was cancelled.
+    """
+    import time
+
+    from .jobs import TERMINAL
+
+    cfg = state.cfg
+    path = Path(ctx.params["path"])
+    after = [int(j) for j in ctx.params.get("after", [])]
+    if not fsutil.is_within(path, uploads_dir(cfg)) or path.resolve() == uploads_dir(cfg).resolve():
+        raise RuntimeError(f"{path} is not inside _manager/uploads; refusing to touch it")
+    while True:
+        jobs = [state.queue.get(j) for j in after]
+        if all(j and j["status"] in TERMINAL for j in jobs):
+            break
+        ctx.check()
+        time.sleep(2)
+    bad = [j for j in jobs if j["status"] != "done"]
+    if bad:
+        detail = ", ".join(f"#{j['id']} {j['status']}" for j in bad)
+        ctx.log(f"Not cleaning up {path.name}: job(s) {detail}. The upload stays so you can retry.")
+        ctx.count("kept")
+        return {"left_in_place": detail}
+    if not path.exists():
+        ctx.log(f"{path.name} is already gone (e.g. moved into _source); nothing to do")
+        return {}
+    batch = fsutil.new_trash_batch(cfg.trash_dir)
+    dest = fsutil.move_to_trash(path, cfg.roms, batch)
+    ctx.count("trashed")
+    ctx.log(f"All {len(after)} job(s) succeeded; moved the upload to {dest} (restore it from the Trash page)")
+    state.library.invalidate()
+    return {}
+
+
 def run_job(state, ctx) -> dict:
     prm = ctx.params
     sysdef = state.system(prm["system"])

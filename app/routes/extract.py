@@ -9,7 +9,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from .. import archives, fsutil
-from ..extract import import_targets, plan as make_plan
+from ..extract import import_targets, plan as make_plan, queue_upload_cleanup
 from ..hooks import lynx
 from ..systems import detect_system
 from . import redirect, render, st
@@ -114,6 +114,7 @@ def run(request: Request, path: str = Form(...), system: str = Form(...), import
     title = f"Extract {p.name} → {system}" + (f" ({import_mode} into _source)" if import_mode != "none" else "")
     job_id = s.queue.submit("extract", title, {"archive": str(p), "system": system, "import_mode": import_mode,
                                                "convert": convert}, system=system)
+    queue_upload_cleanup(s, p, [job_id])
     return redirect(request, f"/jobs/{job_id}")
 
 

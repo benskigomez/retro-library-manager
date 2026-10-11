@@ -101,6 +101,8 @@ You choose a system for anything still ambiguous (e.g. small headerless `.bin` f
 
 Every system page has a **search box** for its files.
 
+**Uploads tidy themselves up.** Files uploaded from the browser (Import or Identify) land in `_manager/uploads/`. Once every job that used an upload has finished successfully, a final job moves it to the Trash, where it stays restorable until you purge it. If any of those jobs failed or was cancelled, the upload is left in place so you can retry. Archives picked from elsewhere on the share are never touched.
+
 Disc systems: put per-game archives in a folder, then go to **Disc → CHD** → pick the folder and system → **Dry run** → **Convert selected**.
 
 ---
