@@ -70,7 +70,7 @@ check("7zz read_member stops early", t_read_member_7z_early_stop)
 
 # --- the full extraction engine on a zip of per-game .7z files (the 32X layout) ---
 def t_engine_inner_7z():
-    from app.config import Config
+    from app.config import DATA_DIR, load_yaml_config
     from app.extract import execute
     from app.systems import System
 
@@ -78,7 +78,7 @@ def t_engine_inner_7z():
     outer = work / "set.zip"
     with zipfile.ZipFile(outer, "w") as zf:
         zf.writestr("Game (USA).7z", seven.read_bytes())
-    cfg = Config()
+    cfg = load_yaml_config((DATA_DIR / "config.default.yaml").read_text())  # the shipped filter rules
     cfg.paths.roms = str(roms)
     cfg.paths.temp = str(work / "tmp")
     cfg.stability.wait_seconds = 0
